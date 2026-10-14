@@ -1,0 +1,1 @@
+{"name":"VRWebSwing.Editor","references":["VRWebSwing","Unity.InputSystem","Unity.XR.CoreUtils","Unity.XR.Interaction.Toolkit"],"includePlatforms":["Editor"]}

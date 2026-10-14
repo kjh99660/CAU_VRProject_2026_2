@@ -1,0 +1,1 @@
+{"name":"VRWebSwing.Tests","references":["VRWebSwing","VRWebSwing.Editor","Unity.InputSystem"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"]}
