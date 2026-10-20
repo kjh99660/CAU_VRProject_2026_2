@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace VRWebSwing
@@ -12,6 +13,19 @@ namespace VRWebSwing
         public Vector3 Velocity { get; private set; }
         public Vector3 PreviousPosition { get; private set; }
         public bool Grounded { get; private set; }
+        public bool Paused { get; private set; }
+        public int ResetVersion { get; private set; }
+        public event Action MotionReset;
+        public Vector3 BodyCenter => body.center;
+        public float BodyRadius => body.radius;
+        public Vector3 SteeringDirection
+        {
+            get
+            {
+                Vector3 forward = Vector3.ProjectOnPlane(input.head.forward, Vector3.up).normalized;
+                return forward * input.Move.y + Vector3.Cross(Vector3.up, forward) * input.Move.x;
+            }
+        }
         public Vector3 Pivot => transform.position + Vector3.up * settings.pivotHeight;
         CharacterController body;
         float correctionUsed;
@@ -26,27 +40,18 @@ namespace VRWebSwing
                     case SwingCommandKind.Restart: course.Restart(); return;
                     case SwingCommandKind.Respawn: course.Respawn(); return;
                     case SwingCommandKind.Attach:
-                        if (course.State != CourseState.Complete) rope.TryAttach(command.ray, command.hand, Pivot);
+                        if (!Paused && course.State != CourseState.Complete) rope.TryAttach(command.ray, command.hand, Pivot);
                         break;
                     case SwingCommandKind.Release: rope.Release(command.hand); break;
                     case SwingCommandKind.Jump:
-                        if (Grounded) { Velocity = new Vector3(Velocity.x, settings.jumpSpeed, Velocity.z); Grounded = false; }
+                        if (!Paused && Grounded) { Velocity = new Vector3(Velocity.x, settings.jumpSpeed, Velocity.z); Grounded = false; }
                         break;
                 }
             }
-            if (course.State == CourseState.Complete) return;
-            Vector3 forward = Vector3.ProjectOnPlane(input.head.forward, Vector3.up).normalized;
-            Vector3 direction = forward * input.Move.y + Vector3.Cross(Vector3.up, forward) * input.Move.x;
+            if (Paused || course.State == CourseState.Complete) return;
+            Vector3 direction = SteeringDirection;
             float dt = Time.fixedDeltaTime;
-            if (Grounded)
-            {
-                Vector3 horizontal = Vector3.MoveTowards(new Vector3(Velocity.x, 0, Velocity.z),
-                    direction * settings.groundSpeed, settings.groundAcceleration * dt);
-                Velocity = new Vector3(horizontal.x, Mathf.Max(Velocity.y, -2), horizontal.z);
-            }
-            else Velocity += direction * (settings.airAcceleration * dt);
-            Velocity += Vector3.down * (settings.gravity * dt);
-            Velocity = Vector3.ClampMagnitude(Velocity, settings.maxSpeed);
+            Velocity = SwingMotionMath.IntegrateVelocity(Velocity, direction, Grounded, settings, dt);
             int steps = Mathf.Max(1, Mathf.CeilToInt(Velocity.magnitude * dt / settings.collisionStep));
             correctionUsed = 0;
             for (int i = 0; i < steps; ++i)
@@ -91,9 +96,12 @@ namespace VRWebSwing
             if (!body) body = GetComponent<CharacterController>();
             body.enabled = false; transform.position = feet; body.enabled = true;
             PreviousPosition = feet;
+            ++ResetVersion; Paused = false;
             Velocity = Vector3.zero; Grounded = false; rope.Detach("Reset"); input.Clear();
+            MotionReset?.Invoke();
         }
-        public void Stop() { Velocity = Vector3.zero; rope.Detach("Course complete"); input.Clear(); }
+        public void Stop() { Velocity = Vector3.zero; rope.Detach("Stopped"); input.Clear(); ++ResetVersion; MotionReset?.Invoke(); }
+        public void SetPaused(bool paused) { Paused = paused; Stop(); PreviousPosition = transform.position; }
         void OnDisable() { Velocity = Vector3.zero; Grounded = false; if (rope) rope.Detach("Motor disabled"); }
         void OnDrawGizmosSelected()
         {

@@ -13,6 +13,25 @@ namespace VRWebSwing.Editor
     {
         public const string ScenePath = "Assets/VRWebSwing/Scenes/WebSwingCourse.unity";
         const string Root = "Assets/VRWebSwing/";
+        [MenuItem("VR Web Swing/Upgrade Comfort in Test Course")]
+        public static void UpgradeComfort()
+        {
+            if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            if (!File.Exists(ScenePath)) { Generate(); return; }
+            var scene = EditorSceneManager.OpenScene(ScenePath);
+            var motor = Object.FindFirstObjectByType<SwingMotor>();
+            if (!motor) throw new System.InvalidOperationException("SwingMotor missing from test course.");
+            var comfort = motor.GetComponent<SwingComfort>();
+            if (!comfort) comfort = motor.gameObject.AddComponent<SwingComfort>();
+            comfort.motor = motor; comfort.input = motor.input;
+            if (!comfort.vignette) comfort.vignette = motor.input.head.GetComponentInChildren<UnityEngine.XR.Interaction.Toolkit.Locomotion.Comfort.TunnelingVignetteController>(true);
+            if (!comfort.vignette) throw new System.InvalidOperationException("Import/install the existing XRI Starter Assets vignette first.");
+            ConfigureVignetteMaterial(comfort);
+            EditorUtility.SetDirty(comfort);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("Comfort comparison configured in " + ScenePath);
+        }
         [MenuItem("VR Web Swing/Create or Open Test Course")]
         public static void CreateOrOpen()
         {
@@ -98,6 +117,7 @@ namespace VRWebSwing.Editor
                 instance.transform.SetParent(camera.transform, false);
                 var comfort = rig.AddComponent<SwingComfort>(); comfort.motor = motor; comfort.input = input;
                 comfort.vignette = instance.GetComponent<UnityEngine.XR.Interaction.Toolkit.Locomotion.Comfort.TunnelingVignetteController>();
+                ConfigureVignetteMaterial(comfort);
             }
             course.motor = motor; course.start = Child("Start Respawn", environment.transform);
             course.start.position = new Vector3(0, 10.1f, 0); rig.transform.position = course.start.position;
@@ -135,6 +155,22 @@ namespace VRWebSwing.Editor
         static Transform Child(string name, Transform parent)
         {
             var child = new GameObject(name).transform; child.SetParent(parent, false); return child;
+        }
+        static void ConfigureVignetteMaterial(SwingComfort comfort)
+        {
+            const string path = Root + "Settings/ComfortVignette.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            var shader = Shader.Find("VRWebSwing/ComfortVignette");
+            if (!shader) throw new System.InvalidOperationException("Comfort URP shader missing.");
+            foreach (var message in ShaderUtil.GetShaderMessages(shader))
+                if (message.severity == UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error)
+                    throw new System.InvalidOperationException("Comfort shader: " + message.message);
+            if (!material)
+            {
+                material = new Material(shader) { enableInstancing = true };
+                AssetDatabase.CreateAsset(material, path);
+            }
+            comfort.vignette.GetComponent<MeshRenderer>().sharedMaterial = material;
         }
         static TrackedPoseDriver Tracking(GameObject target, string path)
         {

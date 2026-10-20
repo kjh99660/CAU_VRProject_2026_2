@@ -8,10 +8,12 @@ namespace VRWebSwing
     {
         public SwingMotor motor;
         public Transform visualRoot;
+        [Tooltip("Remove only artificial parent pitch/roll. Tracked HMD local pose remains untouched.")] public bool stabilizeArtificialTilt = true;
         void LateUpdate()
         {
-            float alpha = Mathf.Clamp01((Time.time - Time.fixedTime) / Time.fixedDeltaTime);
+            float alpha = Time.fixedDeltaTime > 0.0001f ? Mathf.Clamp01((Time.time - Time.fixedTime) / Time.fixedDeltaTime) : 1;
             visualRoot.position = Vector3.Lerp(motor.PreviousPosition, transform.position, alpha);
+            if (stabilizeArtificialTilt) visualRoot.rotation = Quaternion.Euler(0, transform.eulerAngles.y, 0);
         }
         void OnDisable() { if (visualRoot) visualRoot.localPosition = Vector3.zero; }
     }

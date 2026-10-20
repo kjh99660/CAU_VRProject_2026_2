@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -30,9 +31,22 @@ namespace VRWebSwing
         InputAction leftTrigger, rightTrigger, reset, restart, jump, move;
         float yaw, pitch;
         public int PendingCount => commands.Count;
+        public bool DesktopMenuOpen { get; private set; }
+        public event Action ComfortModeRequested, PauseRequested, AbortRequested, ExportRequested;
+        InputAction comfortMode, pause, abort, export;
 
         void Awake()
         {
+            comfortMode = new InputAction("Comfort mode", InputActionType.Button, "<Keyboard>/m");
+            comfortMode.AddBinding("<XRController>{LeftHand}/primaryButton");
+            pause = new InputAction("Pause virtual movement", InputActionType.Button, "<Keyboard>/p");
+            pause.AddBinding("<Keyboard>/f1");
+            pause.AddBinding("<XRController>{RightHand}/menuButton");
+            abort = new InputAction("Stop experience", InputActionType.Button, "<Keyboard>/backspace");
+            abort.AddBinding("<XRController>{RightHand}/secondaryButton");
+            export = new InputAction("Export comfort CSV", InputActionType.Button, "<Keyboard>/f8");
+            comfortMode.performed += ModePressed; pause.performed += PausePressed;
+            abort.performed += AbortPressed; export.performed += ExportPressed;
             leftTrigger = new InputAction("LeftWeb", InputActionType.Button, "<XRController>{LeftHand}/triggerPressed");
             rightTrigger = new InputAction("RightWeb", InputActionType.Button, "<XRController>{RightHand}/triggerPressed");
             reset = new InputAction("Respawn", InputActionType.Button, "<XRController>{LeftHand}/secondaryButton");
@@ -52,6 +66,7 @@ namespace VRWebSwing
         }
         void OnEnable()
         {
+            comfortMode.Enable(); pause.Enable(); abort.Enable(); export.Enable();
             leftTrigger.Enable(); rightTrigger.Enable(); reset.Enable(); restart.Enable(); jump.Enable(); move.Enable();
         }
         void Start()
@@ -72,11 +87,15 @@ namespace VRWebSwing
         }
         void OnDisable()
         {
+            comfortMode.Disable(); pause.Disable(); abort.Disable(); export.Disable();
             leftTrigger.Disable(); rightTrigger.Disable(); reset.Disable(); restart.Disable(); jump.Disable(); move.Disable();
             Clear(); ReleaseMouse();
         }
         void OnDestroy()
         {
+            comfortMode.performed -= ModePressed; pause.performed -= PausePressed;
+            abort.performed -= AbortPressed; export.performed -= ExportPressed;
+            comfortMode.Dispose(); pause.Dispose(); abort.Dispose(); export.Dispose();
             leftTrigger.performed -= LeftDown; leftTrigger.canceled -= LeftUp;
             rightTrigger.performed -= RightDown; rightTrigger.canceled -= RightUp;
             reset.performed -= ResetPressed; jump.performed -= JumpPressed;
@@ -84,6 +103,10 @@ namespace VRWebSwing
             leftTrigger.Dispose(); rightTrigger.Dispose(); reset.Dispose(); restart.Dispose(); jump.Dispose(); move.Dispose();
         }
         void LeftDown(InputAction.CallbackContext c) => Fire(c, SwingHand.Left);
+        void ModePressed(InputAction.CallbackContext c) => ComfortModeRequested?.Invoke();
+        void PausePressed(InputAction.CallbackContext c) => PauseRequested?.Invoke();
+        void AbortPressed(InputAction.CallbackContext c) => AbortRequested?.Invoke();
+        void ExportPressed(InputAction.CallbackContext c) => ExportRequested?.Invoke();
         void LeftUp(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Release, SwingHand.Left);
         void RightDown(InputAction.CallbackContext c) => Fire(c, SwingHand.Right);
         void RightUp(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Release, SwingHand.Right);
@@ -92,8 +115,15 @@ namespace VRWebSwing
         void JumpPressed(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Jump);
         void Fire(InputAction.CallbackContext context, SwingHand hand)
         {
+            if (!IsVR && context.control.device is Mouse && DesktopMenuOpen) return;
             if (!IsVR && context.control.device is Mouse) CaptureMouse();
             Enqueue(SwingCommandKind.Attach, hand);
+        }
+        public void SetDesktopMenuOpen(bool open)
+        {
+            DesktopMenuOpen = open && !IsVR;
+            if (IsVR) return;
+            if (open) ReleaseMouse(); else CaptureMouse();
         }
         public void Enqueue(SwingCommandKind kind, SwingHand hand = SwingHand.Right)
         {
@@ -123,6 +153,7 @@ namespace VRWebSwing
             }
             Move = Vector2.ClampMagnitude(move.ReadValue<Vector2>(), 1);
             if (IsVR) return;
+            if (DesktopMenuOpen) return;
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ReleaseMouse();
             if (Mouse.current != null && Mouse.current.middleButton.wasPressedThisFrame) CaptureMouse();
             if (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked)

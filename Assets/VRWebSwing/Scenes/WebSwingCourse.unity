@@ -1294,6 +1294,8 @@ MonoBehaviour:
   leftTracking: {fileID: 1379568159}
   rightTracking: {fileID: 587359669}
   forceDesktop: 0
+  mouseSensitivity: 0.1
+  captureMouseOnStart: 1
 --- !u!114 &694319299
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1326,8 +1328,30 @@ MonoBehaviour:
   motor: {fileID: 694319295}
   input: {fileID: 694319298}
   vignette: {fileID: 2129764674}
-  useVignette: 1
-  speedThreshold: 6
+  mode: 1
+  tuning:
+    previewOnDesktop: 1
+    maxStrength: 0.7
+    minimumAperture: 0.55
+    feathering: 0.3
+    enterRate: 2
+    restoreRate: 1.5
+    activateScore: 0.08
+    deactivateScore: 0.03
+    speedRange: {x: 6, y: 24}
+    accelerationRange: {x: 10, y: 45}
+    turnRange: {x: 15, y: 90}
+    obstacleRange: {x: 0.5, y: 4}
+    constraintRange: {x: 0.005, y: 0.1}
+    predictionWeights: {x: 0.4, y: 0.2, z: 0.25, w: 0.15}
+    predictiveWeight: 0.5
+    horizon: 0.3
+    predictionSteps: 15
+    predictionHz: 10
+    obstacleCasts: 6
+    sampleHz: 5
+    maxSamples: 2048
+  recordSessions: 1
 --- !u!114 &694319301
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1342,6 +1366,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: VRWebSwing::VRWebSwing.SwingVisualSmoothing
   motor: {fileID: 694319295}
   visualRoot: {fileID: 2091575061}
+  stabilizeArtificialTilt: 1
 --- !u!114 &694319302
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4048,6 +4073,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: TunnelingVignette
       objectReference: {fileID: 0}
+    - target: {fileID: 8429981633443581380, guid: 6c8af5c8012f01440af6cb2bc3eb987c, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value:
+      objectReference: {fileID: 2100000, guid: fc47dcd0dbc9f3945aec91dbacc70199, type: 2}
     - target: {fileID: 8429981633443581382, guid: 6c8af5c8012f01440af6cb2bc3eb987c, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

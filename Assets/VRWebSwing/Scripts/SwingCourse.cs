@@ -12,8 +12,9 @@ namespace VRWebSwing
         [Tooltip("Checkpoint sphere radius in meters; swept player segments detect fast crossings.")] public float radius = 4;
         public CourseState State { get; private set; }
         public int NextCheckpoint { get; private set; }
+        public int RunVersion { get; private set; }
         void Start() => Restart();
-        public void Restart() { NextCheckpoint = 0; State = CourseState.Ready; motor.TeleportTo(start.position); }
+        public void Restart() { ++RunVersion; NextCheckpoint = 0; State = CourseState.Ready; motor.TeleportTo(start.position); }
         public void Respawn()
         {
             if (State == CourseState.Complete) { Restart(); return; }

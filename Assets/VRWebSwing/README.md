@@ -32,7 +32,7 @@
 
 Unity Editor의 Game 뷰에 포커스를 두고 테스트한다. Esc로 잠금을 풀었어도 좌/우 클릭하면 다시 잠그면서 즉시 발사한다(가운데 클릭으로도 잠금 가능). 버튼을 누르는 동안 연결하고 놓으면 해제한다. 십자는 연결 가능한 표면을 향할 때 녹색이다. 데스크톱 발사 Ray는 카메라 중앙을 따르고 줄 그림은 해당 손에서 시작한다. `SwingInput.mouseSensitivity`(도/픽셀)와 `captureMouseOnStart`로 감도·시작 시 잠금을 조정할 수 있다. VR에서는 계속 각 손의 추적 방향으로 발사한다.
 
-마우스 조작 개선 후 Unity가 생성한 컴파일 response와 동일 버전 Roslyn을 사용해 런타임 assembly 컴파일 성공(종료 코드 0)을 확인했다. 아래의 PlayMode 통과 기록은 개선 전 코어 검증 기록이다. 개선 후에는 프로젝트가 Editor에 열려 있어 별도 batch PlayMode 재실행이 차단됐다. 발사 Ray가 카메라 중앙과 일치하는지 확인하는 assertion을 기존 PlayMode 테스트에 추가했으며 열린 Editor의 Test Runner에서 실행할 수 있다.
+마우스 조작과 스윙 코어는 2026-10-20 실제 Unity PlayMode 회귀 테스트에서도 통과했다. 화면 중앙 발사 Ray를 검증하며, 상세 멀미 완화 모드·중단 입력·튜닝은 [Comfort.md](Comfort.md)를 참고한다.
 
 한 번에 줄 하나만 존재한다. 반대 손의 **성공한 발사**는 기존 줄을 교체하며 기존 속도를 유지한다. 실패한 발사는 기존 연결을 보존한다. 해제는 현재 줄 소유 손의 버튼을 놓을 때만 적용된다. 소유권을 넘긴 뒤 이전 손을 놓아도 새 줄은 유지된다. 금색 구체는 마지막 발사 손의 유효 조준점이다. 매우 가까운/범위 밖의 연결은 거부된다.
 
@@ -63,7 +63,7 @@ CharacterController + 직접 제약 계산을 선택했다. 학생 팀이 속도
 - OpenXR 런타임과 해당 컨트롤러 interaction profile을 장비에 맞게 Project Settings > XR Plug-in Management > OpenXR에서 확인해야 한다. VIVE Pro는 SteamVR OpenXR 런타임과 해당 컨트롤러 프로필, Quest 3는 Android OpenXR/Meta 설정과 컨트롤러 프로필, 빌드 모듈과 장비 배포 설정을 확인한다. 기존 사용자 XR 설정은 유지했다.
 - VIVE wand처럼 secondaryButton이 없는 장비에서는 SwingInput의 복귀 바인딩을 지원되는 버튼으로 바꾼다. menuButton이 런타임 시스템 메뉴에 예약된 장비에서는 전체 재시작 바인딩을 다른 사용 가능한 버튼으로 바꾼다.
 - 장비 없이 OpenXR 자동 초기화하면 `XR_ERROR_RUNTIME_UNAVAILABLE` 진단이 나올 수 있다. 데스크톱 전용 검증 시 Standalone의 Initialize XR on Startup을 잠시 끌 수 있다. 이 프로젝트 설정은 자동으로 바꾸지 않는다.
-- 비네트는 기존 Starter Assets 프리팹을 재사용하며 VR 속도 6m/s부터 기본 XRI 효과를 요청한다. SwingComfort.useVignette와 speedThreshold로 조정한다. 장비별 체감 검증이 필요하다.
+- 비네트는 기존 XRI 제어기/메시와 전용 URP 머티리얼을 사용한다. SwingComfort의 A/B/C 모드와 Tuning에서 속도·예측 점수, 최대 강도·복원·시야 확보를 조정한다. M으로 모드 변경, P/F1로 메뉴·일시정지, Backspace로 안전 복귀 후 중단한다. 장비별 체감 검증이 필요하다.
 
 ## 파라미터와 성능
 
@@ -88,7 +88,7 @@ attachMask는 생성 씬의 layer 8이다. 프로젝트 Layer 이름은 변경�
 
 Unity 6000.3.24f1 batch Editor로 컴파일 및 실제 씬/프리팹/재질/설정 생성에 성공했다. 제한 실행 환경에서 최초 Editor 프로세스가 소켓 초기화 중 충돌하여 일반 실행 환경으로 검증했다.
 
-`Window > General > Test Runner`에서 EditMode의 `VRWebSwing.Tests`(수학 4개)와 PlayMode의 `VRWebSwing.PlayModeTests`(통합 1개)를 각각 실행한다. 통합 테스트는 실제 Input System 모의 마우스 edge, 좌우 소유권, 연결 실패·재연결·해제 관성, 근접 연결 거부, 실제 고정 물리 단계의 진자 제약, 35m/s에서 0.1m 벽 충돌, 착지, 낙하 복귀, CP 순서·복귀·완료·재시작을 검증한다.
+`Window > General > Test Runner`에서 EditMode의 `VRWebSwing.Tests`(8개)와 PlayMode의 `VRWebSwing.PlayModeTests`(통합 2개)를 각각 실행한다. 기존 스윙/입력/벽 충돌/복귀 회귀와 비교 모드/예측/중단/CSV를 검증한다. 이전 2026-10-14 기록은 당시 코어 검증 이력이며 최신 검증은 루트 README와 Comfort.md를 참고한다.
 
 배치 명령:
 ```text

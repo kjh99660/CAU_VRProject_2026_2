@@ -16,6 +16,9 @@ namespace VRWebSwing
         public SwingHand Owner { get; private set; }
         public string Status { get; private set; } = "Ready";
         public bool CanAttach { get; private set; }
+        public int StateVersion { get; private set; }
+        public int SuccessfulShots { get; private set; }
+        public int FailedShots { get; private set; }
 
         public bool FindAnchor(Ray ray, out RaycastHit hit)
         {
@@ -24,15 +27,15 @@ namespace VRWebSwing
         }
         public bool TryAttach(Ray ray, SwingHand hand, Vector3 pivot)
         {
-            if (!FindAnchor(ray, out RaycastHit hit)) { Status = "Miss (previous web preserved)"; return false; }
+            if (!FindAnchor(ray, out RaycastHit hit)) { ++FailedShots; Status = "Miss (previous web preserved)"; return false; }
             float distance = Vector3.Distance(pivot, hit.point);
             if (distance < settings.minRopeLength || distance > settings.maxAttachDistance)
-            { Status = "Anchor too close / far"; return false; }
+            { ++FailedShots; Status = "Anchor too close / far"; return false; }
             Anchor = hit.point; Length = distance; Owner = hand; Attached = true;
-            Status = "Attached: " + hand; return true;
+            ++StateVersion; ++SuccessfulShots; Status = "Attached: " + hand; return true;
         }
         public void Release(SwingHand hand) { if (Attached && Owner == hand) Detach("Released"); }
-        public void Detach(string reason) { Attached = false; Status = reason; }
+        public void Detach(string reason) { if (Attached) ++StateVersion; Attached = false; Status = reason; }
         void LateUpdate()
         {
             line.enabled = Attached;
