@@ -8,30 +8,33 @@ namespace VRWebSwing
         public SwingCourse course;
         public WebRope rope;
         public SwingInput input;
-        public TextMesh worldText;
-        string status;
+        public TextMesh distanceText;
+        string distanceLabel, bestLabel;
+        GUIStyle distanceStyle, bestStyle;
         float nextRefresh;
         SwingComfort comfort;
-        void Awake() { comfort = motor.GetComponent<SwingComfort>(); }
+        void Awake()
+        {
+            comfort = motor.GetComponent<SwingComfort>();
+            // Compatibility for older/validation scenes: never display the former camera-attached debug panel.
+            Transform legacy = input.head.Find("World HUD");
+            if (legacy) legacy.gameObject.SetActive(false);
+        }
         void Update()
         {
             if (Time.unscaledTime < nextRefresh) return;
             nextRefresh = Time.unscaledTime + 0.1f;
-            status = $"{course.State} | CP {course.NextCheckpoint}/3\nSpeed {motor.Velocity.magnitude:F1} m/s | Ground {motor.Grounded}\nWeb {rope.Attached} | Length {rope.Length:F1} m | Aim {rope.CanAttach}\n{rope.Status}\n";
-            worldText.text = status + (input.IsVR
-                ? "Triggers: hold web / release owner\nLeft stick: move | Right A: jump\nLeft Y: respawn | Left menu: restart"
-                : "Mouse: look / aim | Click: capture + fire | Esc: free mouse\nLMB / RMB: hold left / right web; release to detach\nWASD: move | Space: jump | R: respawn | T: restart");
-            if (course.State == CourseState.Complete) worldText.text += "\nCOMPLETE! Respawn or restart";
-            if (comfort)
+            if (distanceText) distanceText.gameObject.SetActive(course.IsEndless && input.IsVR);
+            if (course.IsEndless)
             {
-                worldText.text += $"\nComfort: {comfort.mode} | Score {comfort.Score:F2} | Mask {comfort.AppliedStrength:F2}\nM / Left X: mode | P or F1 / Right menu: pause\nBackspace / Right B: STOP + safe return | F8: CSV";
-                if (motor.Paused) worldText.text += "\nPAUSED - P to resume, R to return, T to restart";
+                distanceLabel = $"{course.RunDistance:F1} m";
+                bestLabel = $"BEST {course.BestDistance:F1} m | LAST {course.LastRunDistance:F1} m";
+                if (distanceText) distanceText.text = "DISTANCE\n" + distanceLabel + "\n" + bestLabel;
             }
         }
         void OnGUI()
         {
             if (input.IsVR) return;
-            GUI.Box(new Rect(12, 12, 600, 265), worldText.text);
             if (comfort && input.DesktopMenuOpen)
             {
                 if (GUI.Button(new Rect(12, 280, 120, 28), "A Baseline")) comfort.SetMode(ComfortMode.Baseline);
@@ -48,6 +51,18 @@ namespace VRWebSwing
             GUI.DrawTexture(new Rect(x - 7, y - 1, 14, 2), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(x - 1, y - 7, 2, 14), Texture2D.whiteTexture);
             GUI.color = previousColor;
+            if (course.IsEndless)
+            {
+                if (distanceStyle == null)
+                {
+                    distanceStyle = new GUIStyle(GUI.skin.label) { fontSize = 28, alignment = TextAnchor.MiddleRight };
+                    bestStyle = new GUIStyle(GUI.skin.label) { fontSize = 13, alignment = TextAnchor.MiddleRight };
+                }
+                float right = Screen.width - 264;
+                GUI.Box(new Rect(right, 12, 252, 108), "DISTANCE");
+                GUI.Label(new Rect(right + 8, 39, 236, 42), distanceLabel, distanceStyle);
+                GUI.Label(new Rect(right + 8, 83, 236, 25), bestLabel, bestStyle);
+            }
         }
     }
 }

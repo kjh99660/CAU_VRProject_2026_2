@@ -10,7 +10,7 @@ namespace VRWebSwing.Tests
     {
         [UnityTest] public IEnumerator ComparisonPredictionAndLifecycle()
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("WebSwingCourse");
+            SwingTestScene.LoadValidation();
             yield return null;
             var motor = Object.FindFirstObjectByType<SwingMotor>();
             var comfort = motor.GetComponent<SwingComfort>();

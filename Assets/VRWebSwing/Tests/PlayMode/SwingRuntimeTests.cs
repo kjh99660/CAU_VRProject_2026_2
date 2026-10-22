@@ -11,7 +11,7 @@ namespace VRWebSwing.Tests
     {
         [UnityTest] public IEnumerator RuntimeFlowAndCollision()
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("WebSwingCourse");
+            SwingTestScene.LoadValidation();
             yield return null;
             var motor = Object.FindFirstObjectByType<SwingMotor>();
             var input = motor.input; var rope = motor.rope; var course = motor.course;

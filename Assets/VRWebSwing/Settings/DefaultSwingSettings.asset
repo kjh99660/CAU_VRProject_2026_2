@@ -19,9 +19,19 @@ MonoBehaviour:
   airAcceleration: 4
   jumpSpeed: 8
   maxAttachDistance: 40
+  maxRopeLength: 40
   minRopeLength: 1
+  autoShortenForFloor: 1
+  floorClearance: 0.5
+  floorReelSpeed: 3
+  floorProbeDistance: 80
+  floorProbeOffset: 0.45
+  floorMask:
+    serializedVersion: 2
+    m_Bits: 4294967291
+  floorNormalMinY: 0.6
   maxCorrection: 1.5
   ropeTolerance: 0.08
   collisionStep: 0.2
   pivotHeight: 0.9
-  failHeight: -8
+  failHeight: -13

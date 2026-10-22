@@ -1,5 +1,44 @@
 # VR Web Swing 기술 데모
 
+현재 기본 실행 씬은 **바닥 없는 무한 건물 맵**이다. 시작 플랫폼만 유지하고 기존 중간 플랫폼/체크포인트는 기본 씬에서 제거했다. 원래 유한 코스는 `Scenes/WebSwingValidation.unity`에 검증용으로 보존했다. 아래 과거 코스 설명은 이 검증 씬에 해당하며, 현재 플레이 방법은 다음 무한 맵 절을 기준으로 한다.
+
+## 무한 건물 맵 (2026-10-22)
+
+- 실행: `Scenes/WebSwingCourse.unity` → Play → Game 뷰 클릭. 이동·발사·멀미 완화 입력은 그대로다.
+- 기존 복사본 변환: 메뉴 **VR Web Swing > Upgrade to Endless City**. 알려진 코스 건물/게이트/중간 바닥만 제거하고 시작 플랫폼, 리그 및 설정을 유지한다. 유한 코스 백업과 전용 프리팹은 최초 한 번만 만들고 재실행 시 중복 생성하지 않는다.
+- R, T, 낙하(Y < -13m)는 시작점으로 돌아와 새 시도를 시작한다. 낙하 기준은 기존 -8m보다 5m 낮췄다. 체크포인트나 자동 완료는 없다. 중단 입력은 시작점에 복귀한 뒤 대기한다.
+- 거리 단위는 m이며 출발점부터 +Z 방향 최대 전진 거리다. 수직 비행/왕복/머리 이동을 합산한 경로 길이가 아니다. `DISTANCE`는 이번 시도, `BEST`는 Play 세션 최고, `LAST`는 직전 시도의 거리다. 재시도 시 DISTANCE만 초기화하며 기록은 디스크에 영구 저장하지 않는다.
+- 데스크톱은 우측 상단 GUI, VR은 카메라 아래 `Distance HUD` TextMesh에 표시한다. 화면 표시 문자열은 기존 HUD처럼 10Hz로 갱신한다. 실제 HMD 시야 내 위치·글자 크기는 장비에서 확인해야 한다.
+- 중앙 카메라 부착 안내·디버그 텍스트와 상시 디버그 패널은 제거했다. 기본 씬의 `World HUD` 오브젝트를 삭제하고 이전 검증 씬의 구형 HUD도 런타임에 숨긴다. 우측 거리와 조준선, 사용자가 P/F1로 여는 메뉴는 유지한다. VR 거리 TextMesh는 VR에서만 활성화한다.
+- `DefaultSwingSettings.asset > Max Rope Length` 기본값은 40m이다. 신체 pivot에서 연결점까지의 초기 길이를 제한하며 초과 발사는 기존 줄을 바꾸지 않는다. 목표 길이를 순간적으로 잘라 플레이어를 당기지 않는다. 별도 Max Attach Distance 범위도 만족해야 한다. 최대값을 실행 중 바꾸면 다음 연결부터 적용한다.
+
+### 구성과 조절
+
+| 파일/컴포넌트 | 역할 |
+|---|---|
+| `EndlessCity.cs` | 준비된 구간 풀의 앞/뒤 배치, 연결된 구간 보호, Z 원점 이동 |
+| `EndlessSceneBuilder.cs` (Editor) | 기존 코스 백업/변환, 반복 건물 프리팹·풀·거리 HUD 생성 |
+| `Prefabs/EndlessCitySegment.prefab` | 좌우 건물 2개 + 머리 위 연결 타깃 1개, 단순 불투명 프리미티브 |
+| `SwingCourse` 확장 | 무한/유한 진행 구분, 전진 거리·기록, 시작점 복귀 |
+| `SwingMotor`, `WebRope`, `SwingInput` 확장 | 원점 이동 시 속도·줄·소유 손·입력 큐 Ray의 상대 관계 유지 |
+| `SwingHud` 확장 | 화면 우측 상단/VR 거리 표시 |
+
+`Endless City` Inspector에서 Segment Length=24m, Pool Size=12, Segments Behind=2, Rebase Distance=512m를 사용한다. Pool Size를 바꾸면 편집 상태에서 변환 메뉴를 다시 실행해 직렬화된 풀 크기를 맞춘다. 런타임은 준비된 풀을 우선 사용한다. 구간 길이는 프리팹의 건물 간격과 맞춰야 한다. 프리팹을 편집하면 모든 반복 구간의 모양이 바뀐다.
+
+12개 구간 중 11개로 주변 범위를 채우고 1개는 예비로 둔다. 현재 줄의 AnchorSurface가 속한 구간은 뒤로 밀려나도 재배치하지 않으며 예비 구간으로 앞쪽을 채운다. 줄 해제 후에는 다시 풀에 반환한다. 런타임 매 프레임 생성·파괴/전체 씬 검색을 하지 않는다. 구간 경계나 연결 상태 변경 때만 고정 크기 배열을 순회해 배치하고 물리 Transform을 동기화한다.
+
+주행이 길어지면 구간 길이의 배수만큼 Z 원점을 옮긴다. 리그 루트는 motor의 명시적 메서드만 이동시키며 속도와 추적 카메라 local pose는 유지한다. 시작 영역·건물·현재 연결점·대기 중인 발사 Ray도 함께 옮긴다. 논리적 거리는 double 오프셋을 더해 계산하므로 UI 기록은 끊기지 않는다. 예측 좌표/미분 기록만 초기화하며 비네트 강도를 원점 이동 때문에 껐다 켜지 않는다.
+
+시작 플랫폼 외의 별도 바닥은 없다. 건물 벽과 옥상의 충돌은 유지하며 코스는 +Z 방향의 반복 통로다. 좌우 무제한 도시, 랜덤 생성, 이동 장애물은 이번 범위가 아니다. 바닥을 찾지 못하는 공중 연결에서는 이전에 추가한 바닥 기준 감기를 하지 않고 연결 길이를 유지한다.
+
+### 검증과 제한
+
+동일 Unity 버전 컴파일 및 실제 씬 변환을 수행했다. 최신 테스트는 EditMode 10개와 PlayMode 4개다. 기존 3개 PlayMode 회귀는 `WebSwingValidation.unity`를 Editor에서 직접 로드하고, 새 테스트는 기본 무한 씬을 로드한다. 검증 씬은 일반 빌드 실행 목록에 추가하지 않는다.
+
+새 통합 테스트는 거리의 수직/왕복 중복 방지, BEST/LAST 유지, 연결 구간 보호와 예비 활용, 연결 상태의 원점 이동 및 대기 입력 Ray 보정, 200구간(4,800m) 동안 동일 인스턴스 재사용, 바닥 미검출과 낙하 후 시작 영역 복원을 확인한다. 구간 이동을 강제로 진행한 스트레스 테스트이며 실제 4,800m 스윙 플레이나 성능 측정은 아니다. 로그는 `Logs/Endless-Configure.log`, `Endless-EditMode.xml`, `Endless-PlayMode.xml` 및 대응 `.log`에 있다.
+
+렌더 거리 기본값은 180m다. 멀리 보이는 경계·VR 거리 HUD의 시인성·재배치 시 프레임 타이밍은 장비에서 검증하고 풀 크기/렌더 거리를 함께 조절해야 한다. VIVE Pro/Quest 3 FPS 목표 달성을 확인한 것은 아니다. 현재 최고 기록은 Play 종료 시 초기화된다.
+
 ## 프로젝트 확인과 변경 범위
 
 - Unity **6000.3.24f1**, URP **17.3.0**, Input System **1.20.0** (`activeInputHandler = 1`).
@@ -15,7 +54,7 @@
 3. 씬이 없으면 메뉴 **VR Web Swing > Create or Open Test Course**를 실행한다. 기존 작업 중인 씬의 저장 여부를 묻고, 코스가 이미 있으면 그대로 연다. 기존 코스·설정·프리팹을 덮어쓰거나 중복 생성하지 않는다.
 4. 배치 생성 진입점은 `-executeMethod VRWebSwing.Editor.SwingSceneBuilder.Generate`이다. 이미 있는 씬은 생성 작업을 건너뛴다.
 
-회색 시작 플랫폼 → 머리 위의 넓은 밝은 회색 타깃 → 금색 CP 1/2/3 순서다. 각 구간에는 착지 플랫폼과 좌우 건물이 있다. 시작 플랫폼 가장자리로 움직이며 위쪽 타깃에 연결하고 점프하여 진자를 만든다. 해제 후 다음 타깃에 다시 연결한다. CP 3 통과 시 속도와 줄을 정지하고 완료 표시를 띄운다. Y < -8m이면 최근 CP의 안전한 플랫폼으로 복귀한다. 씬의 Fall Volume은 이 높이를 시각적으로 확인하는 편집용 trigger이며, 실제 실패 판정은 motor의 높이 검사로 처리한다.
+기존 검증 씬에서는 회색 시작 플랫폼 → 머리 위 타깃 → 금색 CP 1/2/3 순서다. 현재 기본 무한 씬에서는 시작 플랫폼 가장자리에서 위쪽 타깃에 연결하고 점프해 출발한 뒤, 반복 건물로 재연결하며 +Z 방향으로 진행한다. 낙하 판정은 motor의 높이 검사로 처리한다.
 
 ## 조작
 
@@ -45,7 +84,7 @@ Unity Editor의 Game 뷰에 포커스를 두고 테스트한다. Esc로 잠금�
 | RopeMath | 느슨한 줄은 무보정; 초과 길이만 보정하고 바깥쪽 속도 성분만 제거 |
 | WebRope | 표면 Raycast, 연결점/길이/소유 손, LateUpdate의 LineRenderer와 조준 표시 |
 | SwingCourse | Ready → Playing → Complete, CP 순서와 swept segment 통과 검사, 최근 CP 및 전체 재시작 |
-| SwingHud | 속도·접지·줄 길이·연결 상태·조준 가능·CP·조작 안내. 표시 문자열은 10Hz로 갱신 |
+| SwingHud | 우측 상단 거리·최고·직전 기록과 조준선, 명시적으로 여는 비교 메뉴. 거리 문자열은 10Hz 갱신; 중앙 디버그 텍스트는 제거 |
 | SwingVisualSmoothing | 50Hz 물리 위치 사이에서 추적 그룹의 시각 위치만 보간; 리그 루트/추적 카메라 로컬 자세를 수정하지 않음 |
 | SwingComfort | 설치된 XRI TunnelingVignetteController에 빠른 VR 이동을 연결. 비활성화 시 provider 정리 |
 | SwingSceneBuilder (Editor 전용 assembly) | 회색 박스 씬, 설정, 정적 건물 프리팹, 머리·양손 TrackedPoseDriver 및 XR Origin 생성 |
@@ -65,6 +104,38 @@ CharacterController + 직접 제약 계산을 선택했다. 학생 팀이 속도
 - 장비 없이 OpenXR 자동 초기화하면 `XR_ERROR_RUNTIME_UNAVAILABLE` 진단이 나올 수 있다. 데스크톱 전용 검증 시 Standalone의 Initialize XR on Startup을 잠시 끌 수 있다. 이 프로젝트 설정은 자동으로 바꾸지 않는다.
 - 비네트는 기존 XRI 제어기/메시와 전용 URP 머티리얼을 사용한다. SwingComfort의 A/B/C 모드와 Tuning에서 속도·예측 점수, 최대 강도·복원·시야 확보를 조정한다. M으로 모드 변경, P/F1로 메뉴·일시정지, Backspace로 안전 복귀 후 중단한다. 장비별 체감 검증이 필요하다.
 
+## 연결 시 바닥 기준 자동 줄 감소 (2026-10-22)
+
+줄을 반지름으로 하는 스윙 원의 최저점을 기준으로 연결 시 목표 길이를 한 번 정한다.
+
+```text
+목표 길이 = 연결점 Y - 샘플 바닥 Y - pivotHeight - floorClearance
+목표 길이는 최소 줄 길이 이상, 현재 연결 길이 이하로 제한
+```
+
+연결 높이 바로 아래에서 아래 방향 Raycast를 최대 3회 수행한다. 건물 표면 바깥쪽으로 조금 띄운 연결점 아래, 플레이어의 수평 위치, 두 위치의 중간을 검사하고 가장 높은 유효 바닥을 쓴다. 천장을 바닥으로 잡지 않도록 연결 높이보다 0.05m 아래에서 시작한다. 트리거·플레이어 레이어는 제외하고 가파른 표면은 무시한다. 바닥 미검출/옵션 해제 시 초기 길이를 유지한다. 실패한 발사는 기존 연결의 목표를 변경하지 않는다. 재연결할 때 새로 계산하며 해제·복귀는 감기 상태를 초기화한다.
+
+`DefaultSwingSettings.asset > One-shot floor clearance reel` 설정:
+
+| 설정 | 기본값 / 의미 |
+|---|---|
+| Auto Shorten For Floor | true, A/B/C에 동일 적용. false로 기존 고정 길이 방식 비교 |
+| Floor Clearance | 0.5m, 스윙 최저점에서 발과 바닥 사이 목표 여유 |
+| Floor Reel Speed | 3m/s, 목표 길이까지 줄이는 최대 속도 |
+| Floor Probe Distance | 80m, 연결점 아래 검사 거리 |
+| Floor Probe Offset | 0.45m, 건물 벽 바깥 검사 오프셋 |
+| Floor Mask / Normal Min Y | 기본 Raycast 레이어 / 0.6, 바닥 판정 대상과 경사 제한 |
+
+예를 들어 연결점 Y=22m, 바닥 Y=10m이면 발 기준 pivotHeight=0.9m와 여유 0.5m를 제외한 허용 길이는 10.6m이다. 더 짧은 줄은 늘리지 않는다. 최소 길이로도 여유가 부족하면 `Floor clearance limited by minimum rope`를 표시한다.
+
+실제 줄 길이는 연결 순간 바꾸지 않고 FixedUpdate에서 감는다. 초당 감소량 외에도 남은 제약 보정 예산의 25%로 감소량을 제한하며, CharacterController.Move의 capsule sweep을 통과한 경우에만 새 길이를 확정한다. 보정 예산이 부족하면 해당 step의 감기를 미루고, 벽이 감기를 막으면 기존 길이를 유지하고 감기를 중단한다. 일반 스윙의 충돌/과도한 보정 시 해제 규칙은 유지한다. HUD는 `현재 길이 -> 목표 길이`와 Reeling 상태를, 선택 Gizmo는 목표 반지름과 샘플 바닥을 표시한다.
+
+예측 계산도 복사한 목표 길이에 같은 감소 속도·보정 예산 규칙을 적용하며 실제 줄 길이나 플레이어를 바꾸지 않는다. 현재 구현은 기존 거리 제약을 점진적으로 바꾸는 위치 보정 방식이며, 별도의 윈치 힘/토크 시뮬레이션은 아니다.
+
+매 프레임 바닥을 다시 찾거나 원 전체를 샘플링하지 않는다. 연결당 최대 3회 Raycast와 감기 중의 추가 sweep/제약 계산 비용이 있다. 바닥이 없는 공간·다른 높이의 지형·움직이는 바닥·샘플 위치 사이의 장애물은 정확히 판단하지 못한다. 연결 후 바닥 높이가 바뀌어도 목표는 고정된다. 큰 여유가 필요한데 감을 시간이 부족하면 바닥에 먼저 닿을 수 있으므로 기존 충돌 검사를 유지한다. 실제 VR에서 조작감·멀미와 성능을 검증해야 한다.
+
+2026-10-22 검증: Unity 6000.3.24f1에서 컴파일 성공, EditMode **10/10**, PlayMode **3/3** 통과. 추가 테스트는 발 여유/최소 길이/늘리지 않음, 감기 속도·보정 예산·0/NaN dt·옵션, 실제 물리 단계의 점진적 감소, 바닥 변경 뒤 목표 고정, 예측의 실제 줄 비변경과 다음 step 일치, 바닥 미검출·벽 차단·해제 정리를 확인한다. 로그는 `Logs/FloorReel-EditMode.xml`, `Logs/FloorReel-PlayMode.xml`과 같은 이름의 `.log`이다. HMD 실측은 미수행이다.
+
 ## 파라미터와 성능
 
 `Settings/DefaultSwingSettings.asset`의 Inspector Tooltip에 단위와 역할을 기재했다.
@@ -76,9 +147,10 @@ CharacterController + 직접 제약 계산을 선택했다. 학생 팀이 속도
 | 지상 가속 / 지상 속도 | 24 m/s² / 8 m/s |
 | 공중 조향 / 점프 | 4 m/s² / 8 m/s |
 | 최대 연결 거리 / 최소 줄 길이 | 40m / 1m |
+| 최대 줄 길이 | 40m (신규 연결의 신체 pivot 기준 상한) |
 | 물리 step당 보정 예산 / 길이 허용 오차 | 1.5m / 0.08m |
 | 충돌 이동 substep | 0.2m |
-| 물리 pivot 높이 / 낙하 실패 높이 | 0.9m / Y -8m |
+| 물리 pivot 높이 / 낙하 실패 높이 | 0.9m / Y -13m |
 
 attachMask는 생성 씬의 layer 8이다. 프로젝트 Layer 이름은 변경하지 않았다. 플레이어 capsule은 Ignore Raycast layer 2이며 자기 몸은 조준/접지 검사에서 제외한다. 연결 Raycast는 모든 일반 충돌체의 첫 hit를 검사하므로 연결 불가 벽 뒤 타깃에 붙지 않는다. 타깃은 정적 물체만 지원한다.
 
@@ -88,7 +160,7 @@ attachMask는 생성 씬의 layer 8이다. 프로젝트 Layer 이름은 변경�
 
 Unity 6000.3.24f1 batch Editor로 컴파일 및 실제 씬/프리팹/재질/설정 생성에 성공했다. 제한 실행 환경에서 최초 Editor 프로세스가 소켓 초기화 중 충돌하여 일반 실행 환경으로 검증했다.
 
-`Window > General > Test Runner`에서 EditMode의 `VRWebSwing.Tests`(8개)와 PlayMode의 `VRWebSwing.PlayModeTests`(통합 2개)를 각각 실행한다. 기존 스윙/입력/벽 충돌/복귀 회귀와 비교 모드/예측/중단/CSV를 검증한다. 이전 2026-10-14 기록은 당시 코어 검증 이력이며 최신 검증은 루트 README와 Comfort.md를 참고한다.
+`Window > General > Test Runner`에서 EditMode의 `VRWebSwing.Tests`(10개)와 PlayMode의 `VRWebSwing.PlayModeTests`(통합 4개)를 각각 실행한다. 기존 스윙/입력/벽 충돌/복귀 회귀와 비교 모드/예측/중단/CSV, 바닥 기준 자동 줄 감소, 무한 맵을 검증한다. 이전 기록은 당시 코어 검증 이력이며 최신 검증은 위의 무한 맵 절과 루트 README를 참고한다.
 
 배치 명령:
 ```text

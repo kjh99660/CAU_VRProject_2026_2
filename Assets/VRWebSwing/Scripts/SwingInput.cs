@@ -136,6 +136,16 @@ namespace VRWebSwing
             command = default; return false;
         }
         public void Clear() { commands.Clear(); Move = Vector2.zero; }
+        public void ShiftOrigin(Vector3 offset)
+        {
+            int count = commands.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                var command = commands.Dequeue();
+                command.ray.origin -= offset;
+                commands.Enqueue(command);
+            }
+        }
         public Transform Hand(SwingHand hand) => hand == SwingHand.Left ? leftHand : rightHand;
         // Desktop shots follow the screen-center crosshair; the rendered web still starts at its hand.
         public Ray Aim(SwingHand hand) => IsVR

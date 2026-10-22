@@ -139,10 +139,6 @@ namespace VRWebSwing.Editor
             var failure = Cube("Fall Volume (height fallback also active)", new Vector3(0, -10, 30), new Vector3(160, 4, 140), gray, environment.transform);
             failure.GetComponent<Collider>().isTrigger = true; failure.GetComponent<Renderer>().enabled = false;
             var hud = rig.AddComponent<SwingHud>(); hud.motor = motor; hud.course = course; hud.rope = rope; hud.input = input;
-            var hudTransform = Child("World HUD", camera.transform); hudTransform.localPosition = new Vector3(-0.5f, 0.32f, 1.5f);
-            hud.worldText = hudTransform.gameObject.AddComponent<TextMesh>(); hud.worldText.characterSize = 0.018f;
-            hud.worldText.fontSize = 48; hud.worldText.anchor = TextAnchor.UpperLeft;
-            hud.worldText.text = "Web Swing - Play to begin";
             EditorSceneManager.SaveScene(scene, ScenePath);
             // Replace the template's enabled scenes, retaining them as disabled entries for recovery.
             var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>();
@@ -151,6 +147,7 @@ namespace VRWebSwing.Editor
                 if (old.path != ScenePath) scenes.Add(new EditorBuildSettingsScene(old.path, false));
             EditorBuildSettings.scenes = scenes.ToArray();
             AssetDatabase.SaveAssets(); Debug.Log("WebSwing course generated: " + ScenePath);
+            EndlessSceneBuilder.Upgrade();
         }
         static Transform Child(string name, Transform parent)
         {

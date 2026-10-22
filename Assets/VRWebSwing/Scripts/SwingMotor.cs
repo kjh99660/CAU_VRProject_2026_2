@@ -16,6 +16,7 @@ namespace VRWebSwing
         public bool Paused { get; private set; }
         public int ResetVersion { get; private set; }
         public event Action MotionReset;
+        public event Action OriginShifted;
         public Vector3 BodyCenter => body.center;
         public float BodyRadius => body.radius;
         public Vector3 SteeringDirection
@@ -76,7 +77,31 @@ namespace VRWebSwing
                 }
                 if (course.CheckSegment(previous, transform.position)) return;
             }
+            Vector3 beforeReel = transform.position;
+            ApplyFloorReel(dt);
+            if (course.CheckSegment(beforeReel, transform.position)) return;
             if (transform.position.y < settings.failHeight) course.Respawn();
+        }
+        void ApplyFloorReel(float dt)
+        {
+            if (!rope.Reeling) return;
+            float remaining = Mathf.Max(0, settings.maxCorrection - correctionUsed);
+            float nextLength = RopeMath.ReelLength(rope.Length, rope.TargetLength, settings, dt, remaining);
+            Vector3 correction = RopeMath.Correction(Pivot, rope.Anchor, nextLength);
+            if (correction.magnitude > remaining) return; // defer rather than exceed the normal correction budget
+            if (correction.sqrMagnitude > 0)
+            {
+                CollisionFlags flags = body.Move(correction);
+                Grounded = (flags & CollisionFlags.Below) != 0 || (Velocity.y <= 0 && ProbeGround());
+            }
+            // Tighter tolerance for reeling prevents repeated length reductions through a blocked capsule.
+            if (Vector3.Distance(Pivot, rope.Anchor) > nextLength + 0.001f)
+            {
+                rope.StopReeling(); return; // retain the old valid rope length, do not push through the obstacle
+            }
+            rope.CommitReelLength(nextLength);
+            if (Vector3.Distance(Pivot, rope.Anchor) >= rope.Length - 0.001f)
+                Velocity = RopeMath.RemoveOutwardVelocity(Velocity, Pivot, rope.Anchor);
         }
         void OnControllerColliderHit(ControllerColliderHit hit)
         {
@@ -99,6 +124,14 @@ namespace VRWebSwing
             ++ResetVersion; Paused = false;
             Velocity = Vector3.zero; Grounded = false; rope.Detach("Reset"); input.Clear();
             MotionReset?.Invoke();
+        }
+        public void ShiftOrigin(Vector3 offset)
+        {
+            body.enabled = false; transform.position -= offset; body.enabled = true;
+            PreviousPosition -= offset;
+            rope.ShiftOrigin(offset);
+            input.ShiftOrigin(offset);
+            OriginShifted?.Invoke(); // clear prediction coordinates without changing velocity or mask strength
         }
         public void Stop() { Velocity = Vector3.zero; rope.Detach("Stopped"); input.Clear(); ++ResetVersion; MotionReset?.Invoke(); }
         public void SetPaused(bool paused) { Paused = paused; Stop(); PreviousPosition = transform.position; }

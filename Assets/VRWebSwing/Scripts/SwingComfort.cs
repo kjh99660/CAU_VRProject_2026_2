@@ -36,6 +36,7 @@ namespace VRWebSwing
             input.ComfortModeRequested += CycleMode; input.PauseRequested += TogglePause;
             input.AbortRequested += AbortExperience; input.ExportRequested += ExportCsv;
             motor.MotionReset += ResetTransient;
+            motor.OriginShifted += ResetPrediction;
             ResetTransient();
         }
         void OnDisable()
@@ -43,6 +44,7 @@ namespace VRWebSwing
             input.ComfortModeRequested -= CycleMode; input.PauseRequested -= TogglePause;
             input.AbortRequested -= AbortExperience; input.ExportRequested -= ExportCsv;
             motor.MotionReset -= ResetTransient;
+            motor.OriginShifted -= ResetPrediction;
             ResetTransient(); Telemetry.Finish("disabled");
         }
         public void SetMode(ComfortMode value)

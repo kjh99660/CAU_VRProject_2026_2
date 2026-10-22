@@ -12,7 +12,7 @@ Swing XR Origin (CharacterController + SwingMotor, 가상 이동의 유일한 �
     Camera Offset (XROrigin 높이 보정)
       Main Camera (TrackedPoseDriver: 실제 HMD pose)
         TunnelingVignette (XRI 제어기 + 기존 hemisphere mesh)
-        World HUD
+        Distance HUD (VR 우측 상단; 기존 중앙 World HUD는 제거)
       Left Hand / Right Hand (TrackedPoseDriver)
 ```
 
@@ -34,6 +34,8 @@ Swing XR Origin (CharacterController + SwingMotor, 가상 이동의 유일한 �
 기존 스윙 로직 전체를 교체하지 않았다. motor의 속도 적분식을 같은 연산 순서의 순수 함수로 옮겼다. 중력 18m/s², 최고 속도 35m/s, 조향, 줄 길이, 보정 예산과 50Hz 물리 주기는 그대로다. 선택 모드가 이 수치에 접근해 수정하지 않는다. 과도한 보정/벽 충돌 시 줄 해제, 재연결의 속도 보존, 근접 연결 거부도 유지한다. 추가 속도 제한은 도입하지 않았다.
 
 ## 씬 연결과 사용
+
+현재 기본 씬은 무한 건물 맵이며 자동 완료/체크포인트 없이 낙하·중단 시 시작점으로 돌아간다. 이전 유한 코스는 `Scenes/WebSwingValidation.unity`에 보존했다. A/B/C 비교는 동일한 무한 맵의 같은 출발점·같은 이동 설정에서 시간/도달 거리 기준으로 수행할 수 있다. 원점 이동에서는 추적 pose·속도·비네트 강도를 유지하고 예측 좌표와 미분 기록만 버린다. 자세한 거리 정의와 풀 설정은 프로젝트 README를 참고한다.
 
 현재 테스트 씬은 연결되어 있다. 기존 씬을 갱신하려면 **VR Web Swing > Upgrade Comfort in Test Course**를 실행한다. 이 명시적 메뉴는 테스트 씬만 열어 기존 오브젝트를 유지하고 연결한다. 새 코스 생성 메뉴는 기존 씬을 덮어쓰지 않는다. Editor 코드는 별도 Editor assembly에만 포함된다.
 
@@ -82,6 +84,7 @@ Backspace / 오른손 secondaryButton은 중단 기록을 남기고 최근 체�
 - 현재 조향 방향을 유지하고 새로운 점프/연결/해제 입력은 없다고 가정한다. head-relative 조향 중 실제 입력 방향 변화까지 미리 알 수는 없다.
 - 실제 motor와 같은 속도 적분, 거리 기반 이동 substep, RopeMath 최대 길이·바깥쪽 속도 제거, 보정 예산 초과 시 복사된 줄 해제를 사용한다. 독립적인 이상적 진자 방정식을 도입하지 않았다.
 - 기본 15 step/0.3초는 실제 0.02초 물리 step과 같지만 설정을 바꾸면 오차가 생긴다. Grounded 상태는 예측 구간 동안 유지하므로 착지/플랫폼 가장자리 이탈은 예측하지 못한다.
+- 2026-10-22 추가한 바닥 기준 자동 감기는 실제 motor와 예측에서 같은 목표 길이·감는 속도·보정 예산 규칙을 사용한다. 예측에서는 벽 때문에 감기를 중단하는 capsule 응답까지 재현하지 못한다. A/B/C 비교에서는 Auto Shorten For Floor 설정도 동일하게 고정하고, 이전 고정 길이 조건과 비교할 때는 모든 모드에서 함께 끈다.
 - 장애물은 body 중심의 SphereCast로 근사한다. 실제 높이 1.8m capsule, 모서리 slide/stepOffset, depenetration, 동적 장애물의 미래 위치를 재현하지 않는다. 여러 예측 점 사이를 묶은 cast는 곡선에 오차가 있다. 충돌을 감지하면 그 지점에서 예측을 종료하고 이후 응답은 추측하지 않는다.
 - 실제 세계의 `Physics.Simulate`, CharacterController.Move, transform 변경을 예측에서 호출하지 않는다. 코스/거미줄 상태도 바꾸지 않는다.
 - 리스폰/정지·연결 변화에서 미분 이력을 버린다. deltaTime 0, 비유한 값, 정지 방향은 방어한다. 위치 보정의 transform 미분 대신 motor 속도를 사용한다.
