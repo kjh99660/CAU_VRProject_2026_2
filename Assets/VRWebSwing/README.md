@@ -2,6 +2,33 @@
 
 현재 기본 실행 씬은 **바닥 없는 무한 건물 맵**이다. 시작 플랫폼만 유지하고 기존 중간 플랫폼/체크포인트는 기본 씬에서 제거했다. 원래 유한 코스는 `Scenes/WebSwingValidation.unity`에 검증용으로 보존했다. 아래 과거 코스 설명은 이 검증 씬에 해당하며, 현재 플레이 방법은 다음 무한 맵 절을 기준으로 한다.
 
+## 이미지 스카이박스 (2026-10-30)
+
+`Art/Skybox/SKYBOX.jpg`는 제공된 원본 JPG를 바이트 변경 없이 복사한 파일이다. `CloudSkybox.mat`와 URP `ImageSkybox.shader`를 만들어 기본 씬의 RenderSettings.skybox에 연결했다. 카메라 Clear Flags는 Skybox를 사용하고 기존 조명·이동·충돌 설정은 유지했다. 새로 만든 씬에는 **VR Web Swing > Apply Image Skybox**로 적용할 수 있다.
+
+일반 와이드 사진이므로 각도에 따라 같은 구름을 좌우 반전하여 4개 패널로 배치한다. 패널 경계의 색을 이어 붙이고, 상하 끝은 색상으로 전환해 극점의 심한 핀칭을 줄인다. 진짜 360도 촬영 데이터가 아니므로 반복/반전과 전환 부위가 보일 수 있다. 회색 하단도 배경 이미지다.
+
+머티리얼 설정: Exposure=1, Heading=45도(정면을 원본 이미지 중앙으로 맞춤), Mirrored Image Panels=4(짝수로 반올림), Image Horizon=0.265(원본 하단 기준), Source Vertical View=60도, Pole Fade=0.2. Upper/Lower Sky 색으로 극점 색상을 조정한다. 텍스처는 sRGB·2D·mipmap·Trilinear·Clamp·최대 2048px로 임포트하며 픽셀 CPU 읽기는 비활성화했다. 원본 다운로드 폴더를 참조하지 않아 프로젝트를 옮겨도 동작한다.
+
+런타임 업데이트 컴포넌트 없이 배경 패스로 표시한다. 셰이더에 stereo/instancing 매크로를 포함하며 VR에서도 추적 자세나 FOV를 수정하지 않는다. Unity 6000.3.24f1에서 실제 그래픽 장치를 사용하는 batch 실행으로 컴파일과 데스크톱 카메라 렌더를 확인했다. 미리보기는 `Logs/Skybox-Preview.png`, 실행 로그는 `Logs/Skybox-Setup.log`다. HMD 양안 표시·장비 성능은 별도 검증이 필요하다.
+
+## 빌딩 외벽 4종 (2026-10-31)
+
+원본과 편집 이미지 3개를 각각 별도 셰이더·머티리얼·프리팹에 연결했습니다. 아래 파일은 `Assets/VRWebSwing/Art/Buildings/`와 `Assets/VRWebSwing/Prefabs/`에 있습니다.
+
+| 이미지 | 셰이더 파일 | 머티리얼 | 프리팹 / 크기(m) |
+|---|---|---|---|
+| BILUDING.png | BuildingFacade_Original.shader | BuildingFacade_Original.mat | Building_Original / 7×82×11 |
+| BILUDING_Silver.png | BuildingFacade_Silver.shader | BuildingFacade_Small.mat | Building_Small / 6×72×10 |
+| BILUDING_Warm.png | BuildingFacade_Warm.shader | BuildingFacade_Medium.mat | Building_Medium / 8×90×13 |
+| BILUDING_Slate.png | BuildingFacade_Slate.shader | BuildingFacade_Tall.mat | Building_Tall / 10×110×16 |
+
+각 셰이더는 `VRWebSwing/Building Facade Original|Silver|Warm|Slate`로 표시됩니다. 중복 계산 코드는 `BuildingFacadeCommon.hlsl`로 공유합니다. 원본 이미지는 보존하고 실버·브론즈·짙은 블루 계열 변형을 사용합니다. 불투명 Unlit, mipmap, Repeat, 압축 임포트를 사용하며 투명 반사나 실시간 그림자를 추가하지 않았습니다.
+
+구간마다 6개 빌딩에 4종을 섞습니다. 밑면 Y=-50m, 옥상 Y=32/22/40/60m이며 중앙 스윙 통로와 머리 위 연결 타깃은 유지합니다. 전체 이미지 기본 8m 반복으로 건물 크기가 달라도 창문 크기를 유지합니다. 오브젝트 공간 UV를 위해 동적 배칭은 비활성화하며 실제 HMD 성능은 별도 측정해야 합니다. 런타임에 재질을 생성하지 않습니다.
+
+**VR Web Swing > Apply Building Texture and Variants**로 다시 적용합니다. 기존 프리팹의 사용자 스케일/형상을 유지하고 고정 배치 슬롯을 재사용합니다. **Render Building Preview**는 `Logs/BuildingForest-Preview.png`를 생성합니다.
+
 ## 무한 건물 맵 (2026-10-22)
 
 - 실행: `Scenes/WebSwingCourse.unity` → Play → Game 뷰 클릭. 이동·발사·멀미 완화 입력은 그대로다.
@@ -18,7 +45,7 @@
 |---|---|
 | `EndlessCity.cs` | 준비된 구간 풀의 앞/뒤 배치, 연결된 구간 보호, Z 원점 이동 |
 | `EndlessSceneBuilder.cs` (Editor) | 기존 코스 백업/변환, 반복 건물 프리팹·풀·거리 HUD 생성 |
-| `Prefabs/EndlessCitySegment.prefab` | 좌우 건물 2개 + 머리 위 연결 타깃 1개, 단순 불투명 프리미티브 |
+| `Prefabs/EndlessCitySegment.prefab` | 4종 중 빌딩 6개 + 머리 위 연결 타깃 1개, 단순 불투명 프리미티브 |
 | `SwingCourse` 확장 | 무한/유한 진행 구분, 전진 거리·기록, 시작점 복귀 |
 | `SwingMotor`, `WebRope`, `SwingInput` 확장 | 원점 이동 시 속도·줄·소유 손·입력 큐 Ray의 상대 관계 유지 |
 | `SwingHud` 확장 | 화면 우측 상단/VR 거리 표시 |
@@ -33,7 +60,7 @@
 
 ### 검증과 제한
 
-동일 Unity 버전 컴파일 및 실제 씬 변환을 수행했다. 최신 테스트는 EditMode 10개와 PlayMode 4개다. 기존 3개 PlayMode 회귀는 `WebSwingValidation.unity`를 Editor에서 직접 로드하고, 새 테스트는 기본 무한 씬을 로드한다. 검증 씬은 일반 빌드 실행 목록에 추가하지 않는다.
+동일 Unity 버전 컴파일 및 실제 씬 변환을 수행했다. 2026-10-31 최신 검증은 EditMode 10/10, PlayMode 5/5 통과다. 별도 프로젝트 복사본에서 실행하고 생성 에셋을 반영했다. 최신 로그는 루트 `Logs/WebRecovery-*`다. 기존 3개 PlayMode 회귀는 `WebSwingValidation.unity`를 Editor에서 직접 로드하고, 새 테스트는 기본 무한 씬을 로드한다. 검증 씬은 일반 빌드 실행 목록에 추가하지 않는다.
 
 새 통합 테스트는 거리의 수직/왕복 중복 방지, BEST/LAST 유지, 연결 구간 보호와 예비 활용, 연결 상태의 원점 이동 및 대기 입력 Ray 보정, 200구간(4,800m) 동안 동일 인스턴스 재사용, 바닥 미검출과 낙하 후 시작 영역 복원을 확인한다. 구간 이동을 강제로 진행한 스트레스 테스트이며 실제 4,800m 스윙 플레이나 성능 측정은 아니다. 로그는 `Logs/Endless-Configure.log`, `Endless-EditMode.xml`, `Endless-PlayMode.xml` 및 대응 `.log`에 있다.
 
@@ -61,19 +88,19 @@
 | 기능 | 데스크톱 | VR 기본값 |
 |---|---|---|
 | 조준 | Play 시작 시 마우스 자동 잠금, 마우스로 시점 회전, 화면 중앙 십자 조준 | 각 컨트롤러 전방 |
-| 왼손 연결/해제 | 왼쪽 마우스 버튼 누름/놓음 | 왼쪽 트리거 누름/놓음 |
-| 오른손 연결/해제 | 오른쪽 마우스 버튼 누름/놓음 | 오른쪽 트리거 누름/놓음 |
+| 왼손 연결/해제 | 왼쪽 마우스 클릭 연결 / 재클릭 해제 | 왼쪽 트리거 누름/놓음 |
+| 오른손 연결/해제 | 오른쪽 마우스 클릭 연결 / 재클릭 해제 | 오른쪽 트리거 누름/놓음 |
 | 지상 이동/제한된 공중 조향 | WASD | 왼쪽 스틱/트랙패드 |
 | 점프 | Space | 오른손 primaryButton (Quest A) |
 | 최근 CP 복귀 | R | 왼손 secondaryButton (Quest Y) |
 | 전체 재시작 | T | 왼손 menuButton; 완료 후에는 복귀 버튼도 전체 재시작 |
 | 마우스 잠금 해제 | Esc | 해당 없음 |
 
-Unity Editor의 Game 뷰에 포커스를 두고 테스트한다. Esc로 잠금을 풀었어도 좌/우 클릭하면 다시 잠그면서 즉시 발사한다(가운데 클릭으로도 잠금 가능). 버튼을 누르는 동안 연결하고 놓으면 해제한다. 십자는 연결 가능한 표면을 향할 때 녹색이다. 데스크톱 발사 Ray는 카메라 중앙을 따르고 줄 그림은 해당 손에서 시작한다. `SwingInput.mouseSensitivity`(도/픽셀)와 `captureMouseOnStart`로 감도·시작 시 잠금을 조정할 수 있다. VR에서는 계속 각 손의 추적 방향으로 발사한다.
+Unity Editor의 Game 뷰에 포커스를 두고 테스트한다. Esc로 잠금을 풀었어도 좌/우 클릭하면 다시 잠그면서 즉시 발사한다(가운데 클릭으로도 잠금 가능). 마우스는 클릭하면 연결을 유지하고 같은 버튼을 다시 클릭하면 해제한다. `desktopToggleWeb=false`로 기존 누름/놓음 방식을 사용할 수 있다. 포커스 상실 정지는 Game 뷰 클릭으로 복귀하지만 명시적인 P/F1 메뉴와 중단은 유지한다. 십자는 연결 가능한 표면을 향할 때 녹색이다. 데스크톱 발사 Ray는 카메라 중앙을 따르고 줄 그림은 해당 손에서 시작한다. `SwingInput.mouseSensitivity`(도/픽셀)와 `captureMouseOnStart`로 감도·시작 시 잠금을 조정할 수 있다. VR에서는 계속 각 손의 추적 방향으로 발사한다.
 
 마우스 조작과 스윙 코어는 2026-10-20 실제 Unity PlayMode 회귀 테스트에서도 통과했다. 화면 중앙 발사 Ray를 검증하며, 상세 멀미 완화 모드·중단 입력·튜닝은 [Comfort.md](Comfort.md)를 참고한다.
 
-한 번에 줄 하나만 존재한다. 반대 손의 **성공한 발사**는 기존 줄을 교체하며 기존 속도를 유지한다. 실패한 발사는 기존 연결을 보존한다. 해제는 현재 줄 소유 손의 버튼을 놓을 때만 적용된다. 소유권을 넘긴 뒤 이전 손을 놓아도 새 줄은 유지된다. 금색 구체는 마지막 발사 손의 유효 조준점이다. 매우 가까운/범위 밖의 연결은 거부된다.
+한 번에 줄 하나만 존재한다. 반대 손의 **성공한 발사**는 기존 줄을 교체하며 기존 속도를 유지한다. 실패한 발사는 기존 연결을 보존한다. 해제는 마우스에서는 현재 줄 소유 손의 재클릭, VR에서는 해당 손 트리거를 놓을 때 적용된다. 소유권을 넘긴 뒤 이전 손을 놓아도 새 줄은 유지된다. 금색 구체는 마지막 발사 손의 유효 조준점이다. 매우 가까운/범위 밖의 연결은 거부된다.
 
 ## 구성과 계산
 
@@ -152,7 +179,7 @@ CharacterController + 직접 제약 계산을 선택했다. 학생 팀이 속도
 | 충돌 이동 substep | 0.2m |
 | 물리 pivot 높이 / 낙하 실패 높이 | 0.9m / Y -13m |
 
-attachMask는 생성 씬의 layer 8이다. 프로젝트 Layer 이름은 변경하지 않았다. 플레이어 capsule은 Ignore Raycast layer 2이며 자기 몸은 조준/접지 검사에서 제외한다. 연결 Raycast는 모든 일반 충돌체의 첫 hit를 검사하므로 연결 불가 벽 뒤 타깃에 붙지 않는다. 타깃은 정적 물체만 지원한다.
+attachMask는 layer 8 `SwingSurface`(256)다. 메인 씬의 비어 있던 마스크(0)를 복구했고 무한 씬의 빈 마스크는 Awake에서도 복구한다. 플레이어 capsule은 Ignore Raycast layer 2이며 자기 몸은 조준/접지 검사에서 제외한다. 연결 Raycast는 모든 일반 충돌체의 첫 hit를 검사하므로 연결 불가 벽 뒤 타깃에 붙지 않는다. 타깃은 정적 물체만 지원한다.
 
 기존 Fixed Timestep **0.02초(50Hz)**를 유지했다. XR 표시 주사율과 물리 주기는 별도다. 줄은 Rigidbody 체인 대신 LineRenderer 하나를 사용한다. 정적 프리미티브/불투명 Unlit 재질을 사용하고 새 코스의 실시간 그림자는 끈다. 런타임 전체 씬 탐색과 반복 GetComponent는 없다. HUD의 제한된 문자열 갱신을 제외하고 이동/줄 업데이트에서 프레임별 배열·컬렉션 생성을 하지 않는다. VIVE Pro 90FPS 및 Quest 3 지원 모드 120FPS는 **향후 실측 목표**이며 달성을 검증한 것이 아니다.
 
@@ -160,7 +187,7 @@ attachMask는 생성 씬의 layer 8이다. 프로젝트 Layer 이름은 변경�
 
 Unity 6000.3.24f1 batch Editor로 컴파일 및 실제 씬/프리팹/재질/설정 생성에 성공했다. 제한 실행 환경에서 최초 Editor 프로세스가 소켓 초기화 중 충돌하여 일반 실행 환경으로 검증했다.
 
-`Window > General > Test Runner`에서 EditMode의 `VRWebSwing.Tests`(10개)와 PlayMode의 `VRWebSwing.PlayModeTests`(통합 4개)를 각각 실행한다. 기존 스윙/입력/벽 충돌/복귀 회귀와 비교 모드/예측/중단/CSV, 바닥 기준 자동 줄 감소, 무한 맵을 검증한다. 이전 기록은 당시 코어 검증 이력이며 최신 검증은 위의 무한 맵 절과 루트 README를 참고한다.
+`Window > General > Test Runner`에서 EditMode의 `VRWebSwing.Tests`(10개)와 PlayMode의 `VRWebSwing.PlayModeTests`(통합 5개)를 각각 실행한다. 기존 스윙/입력/벽 충돌/복귀 회귀와 비교 모드/예측/중단/CSV, 바닥 기준 자동 줄 감소, 무한 맵을 검증한다. 이전 기록은 당시 코어 검증 이력이며 최신 검증은 위의 무한 맵 절과 루트 README를 참고한다.
 
 배치 명령:
 ```text

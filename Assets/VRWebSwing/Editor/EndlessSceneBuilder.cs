@@ -21,6 +21,7 @@ namespace VRWebSwing.Editor
             var motor = UnityEngine.Object.FindFirstObjectByType<SwingMotor>();
             if (!motor) throw new InvalidOperationException("SwingMotor missing.");
             var course = motor.course;
+            if (motor.rope.attachMask.value == 0) motor.rope.attachMask = 1 << 8;
             if (!course.IsEndless && !File.Exists(ValidationScenePath))
                 if (!AssetDatabase.CopyAsset(SwingSceneBuilder.ScenePath, ValidationScenePath))
                     throw new IOException("Could not preserve the original course validation scene.");

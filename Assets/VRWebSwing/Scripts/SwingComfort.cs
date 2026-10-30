@@ -26,6 +26,7 @@ namespace VRWebSwing
         static readonly ProfilerMarker Marker = new ProfilerMarker("VRWebSwing.Comfort.Update");
         MeshRenderer mask;
         bool registered, engaged, menuOpen, focused = true, haveVelocity;
+        public bool FocusSuspended { get; private set; }
         int resetVersion = -1, ropeVersion = -1, runVersion = -1;
         Vector3 previousVelocity;
         float previousFixedTime, nextPrediction;
@@ -37,6 +38,7 @@ namespace VRWebSwing
             input.AbortRequested += AbortExperience; input.ExportRequested += ExportCsv;
             motor.MotionReset += ResetTransient;
             motor.OriginShifted += ResetPrediction;
+            input.DesktopPlayRequested += ResumeFromFocusClick;
             ResetTransient();
         }
         void OnDisable()
@@ -45,6 +47,7 @@ namespace VRWebSwing
             input.AbortRequested -= AbortExperience; input.ExportRequested -= ExportCsv;
             motor.MotionReset -= ResetTransient;
             motor.OriginShifted -= ResetPrediction;
+            input.DesktopPlayRequested -= ResumeFromFocusClick;
             ResetTransient(); Telemetry.Finish("disabled");
         }
         public void SetMode(ComfortMode value)
@@ -61,18 +64,34 @@ namespace VRWebSwing
         public void ExportCsv() => Telemetry.Export();
         public void SetMenuOpen(bool open)
         {
+            FocusSuspended = false;
             menuOpen = open;
             motor.SetPaused(open); input.SetDesktopMenuOpen(open); ResetTransient();
         }
         void OnApplicationFocus(bool focus)
         {
             if (Application.isBatchMode) return; // no window focus exists in automated physics tests
+            HandleApplicationFocus(focus);
+        }
+        public void HandleApplicationFocus(bool focus)
+        {
             focused = focus;
-            if (!focus && motor) SetMenuOpen(true);
+            if (!focus && motor && !motor.Paused && !menuOpen)
+            {
+                FocusSuspended = true;
+                motor.SetPaused(true); input.ReleaseDesktopCapture(); ResetTransient();
+            }
+        }
+        void ResumeFromFocusClick()
+        {
+            if (!FocusSuspended || menuOpen) return;
+            FocusSuspended = false; focused = true;
+            motor.SetPaused(false); ResetTransient();
         }
         void OnApplicationPause(bool paused)
         {
-            if (paused && motor) { SetMenuOpen(true); Telemetry.Finish("application_paused"); }
+            if (paused && motor) { HandleApplicationFocus(false); Telemetry.Finish("application_paused"); }
+            else if (!paused) focused = Application.isFocused || Application.isBatchMode;
         }
         void OnApplicationQuit() { ResetTransient(); Telemetry.Finish("quit"); }
         public void ResetTransient()
@@ -100,6 +119,7 @@ namespace VRWebSwing
                 if (resetVersion != motor.ResetVersion)
                 {
                     resetVersion = motor.ResetVersion; ResetTransient();
+                    if (!motor.Paused) FocusSuspended = false;
                     if (!motor.Paused && menuOpen) { menuOpen = false; input.SetDesktopMenuOpen(false); }
                 }
                 if (ropeVersion != motor.rope.StateVersion) { ropeVersion = motor.rope.StateVersion; ResetPrediction(); }

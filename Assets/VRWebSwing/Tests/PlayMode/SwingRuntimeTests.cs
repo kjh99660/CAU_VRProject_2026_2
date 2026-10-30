@@ -16,6 +16,7 @@ namespace VRWebSwing.Tests
             var motor = Object.FindFirstObjectByType<SwingMotor>();
             var input = motor.input; var rope = motor.rope; var course = motor.course;
             input.forceDesktop = true;
+            input.desktopToggleWeb = false;
             yield return null;
             // The same input queue used by Input System callbacks preserves two short taps in order.
             input.Clear();

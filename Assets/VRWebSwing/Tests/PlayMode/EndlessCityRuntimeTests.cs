@@ -22,6 +22,7 @@ namespace VRWebSwing.Tests
             var comfort = motor.GetComponent<SwingComfort>(); comfort.recordSessions = false; comfort.SetMenuOpen(false);
             motor.input.forceDesktop = true;
             var course = motor.course; var city = course.endlessCity; var rope = motor.rope;
+            Assert.That(rope.attachMask.value & (1 << 8), Is.Not.Zero, "The building layer must be connectable");
             Assert.That(course.IsEndless, Is.True); Assert.That(course.checkpoints, Is.Empty);
             Assert.That(GameObject.Find("Landing 1"), Is.Null);
             Assert.That(GameObject.Find("Start Platform"), Is.Not.Null);
@@ -34,6 +35,22 @@ namespace VRWebSwing.Tests
             motor.settings = rope.settings = settings;
             Assert.That(city.segments.Length, Is.EqualTo(12));
             Assert.That(city.ActiveSegmentCount, Is.EqualTo(11));
+            var facadeScales = new System.Collections.Generic.HashSet<Vector3>();
+            var facadeTextures = new System.Collections.Generic.HashSet<Texture>();
+            int texturedTowers = 0;
+            foreach (var renderer in city.segments[0].GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (!renderer.name.StartsWith("Facade Tower ")) continue;
+                ++texturedTowers; facadeScales.Add(renderer.transform.localScale);
+                Assert.That(renderer.sharedMaterial.shader.name, Does.StartWith("VRWebSwing/Building Facade "));
+                Assert.That(renderer.sharedMaterial.GetTexture("_BaseMap"), Is.Not.Null);
+                facadeTextures.Add(renderer.sharedMaterial.GetTexture("_BaseMap"));
+                Assert.That(renderer.gameObject.layer, Is.EqualTo(8));
+                var bounds = renderer.GetComponent<BoxCollider>().bounds;
+                Assert.That(bounds.max.x <= -6 || bounds.min.x >= 6, Is.True, "Keep the central swing corridor clear");
+            }
+            Assert.That(texturedTowers, Is.EqualTo(6)); Assert.That(facadeScales.Count, Is.EqualTo(4));
+            Assert.That(facadeTextures.Count, Is.EqualTo(4));
             // Score is forward progress, not vertical motion or repeated backtracking.
             course.CheckSegment(Vector3.zero, new Vector3(0, 10, 100));
             course.CheckSegment(Vector3.zero, new Vector3(0, 100, 80));

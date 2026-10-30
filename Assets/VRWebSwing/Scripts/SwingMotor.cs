@@ -43,6 +43,13 @@ namespace VRWebSwing
                     case SwingCommandKind.Attach:
                         if (!Paused && course.State != CourseState.Complete) rope.TryAttach(command.ray, command.hand, Pivot);
                         break;
+                    case SwingCommandKind.ToggleWeb:
+                        if (!Paused && course.State != CourseState.Complete)
+                        {
+                            if (rope.Attached && rope.Owner == command.hand) rope.Release(command.hand);
+                            else rope.TryAttach(command.ray, command.hand, Pivot);
+                        }
+                        break;
                     case SwingCommandKind.Release: rope.Release(command.hand); break;
                     case SwingCommandKind.Jump:
                         if (!Paused && Grounded) { Velocity = new Vector3(Velocity.x, settings.jumpSpeed, Velocity.z); Grounded = false; }

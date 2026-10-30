@@ -8,7 +8,7 @@ using UnityEngine.XR;
 namespace VRWebSwing
 {
     public enum SwingHand { Left, Right }
-    public enum SwingCommandKind { Attach, Release, Respawn, Restart, Jump }
+    public enum SwingCommandKind { Attach, Release, Respawn, Restart, Jump, ToggleWeb }
     public struct SwingCommand
     {
         public SwingCommandKind kind;
@@ -24,6 +24,7 @@ namespace VRWebSwing
         public bool forceDesktop;
         [Tooltip("Desktop mouse look sensitivity in degrees per pixel.")] [Min(0.001f)] public float mouseSensitivity = 0.1f;
         [Tooltip("Capture the mouse automatically when Play starts without an HMD.")] public bool captureMouseOnStart = true;
+        [Tooltip("Mouse clicks toggle the owning web on/off; XR triggers retain hold/release behavior.")] public bool desktopToggleWeb = true;
         public bool IsVR { get; private set; }
         public Vector2 Move { get; private set; }
         public SwingHand PreviewHand { get; private set; } = SwingHand.Right;
@@ -33,7 +34,11 @@ namespace VRWebSwing
         public int PendingCount => commands.Count;
         public bool DesktopMenuOpen { get; private set; }
         public event Action ComfortModeRequested, PauseRequested, AbortRequested, ExportRequested;
+        public event Action DesktopPlayRequested;
         InputAction comfortMode, pause, abort, export;
+        readonly List<XRDisplaySubsystem> displays = new List<XRDisplaySubsystem>(4);
+        float nextDisplayRefresh;
+        bool trackingModeInitialized;
 
         void Awake()
         {
@@ -63,15 +68,17 @@ namespace VRWebSwing
             rightTrigger.performed += RightDown; rightTrigger.canceled += RightUp;
             reset.performed += ResetPressed; jump.performed += JumpPressed;
             restart.performed += RestartPressed;
+            RefreshTrackingMode(false);
         }
         void OnEnable()
         {
+            RefreshTrackingMode(false);
             comfortMode.Enable(); pause.Enable(); abort.Enable(); export.Enable();
             leftTrigger.Enable(); rightTrigger.Enable(); reset.Enable(); restart.Enable(); jump.Enable(); move.Enable();
         }
         void Start()
         {
-            if (captureMouseOnStart && (forceDesktop || !UnityEngine.XR.InputDevices.GetDeviceAtXRNode(XRNode.Head).isValid))
+            if (captureMouseOnStart && !IsVR)
                 CaptureMouse();
         }
         void CaptureMouse()
@@ -85,6 +92,7 @@ namespace VRWebSwing
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
+        public void ReleaseDesktopCapture() { if (!IsVR) ReleaseMouse(); }
         void OnDisable()
         {
             comfortMode.Disable(); pause.Disable(); abort.Disable(); export.Disable();
@@ -107,17 +115,28 @@ namespace VRWebSwing
         void PausePressed(InputAction.CallbackContext c) => PauseRequested?.Invoke();
         void AbortPressed(InputAction.CallbackContext c) => AbortRequested?.Invoke();
         void ExportPressed(InputAction.CallbackContext c) => ExportRequested?.Invoke();
-        void LeftUp(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Release, SwingHand.Left);
+        void LeftUp(InputAction.CallbackContext c) => Release(c, SwingHand.Left);
         void RightDown(InputAction.CallbackContext c) => Fire(c, SwingHand.Right);
-        void RightUp(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Release, SwingHand.Right);
+        void RightUp(InputAction.CallbackContext c) => Release(c, SwingHand.Right);
         void ResetPressed(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Respawn);
         void RestartPressed(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Restart);
         void JumpPressed(InputAction.CallbackContext c) => Enqueue(SwingCommandKind.Jump);
         void Fire(InputAction.CallbackContext context, SwingHand hand)
         {
             if (!IsVR && context.control.device is Mouse && DesktopMenuOpen) return;
-            if (!IsVR && context.control.device is Mouse) CaptureMouse();
-            Enqueue(SwingCommandKind.Attach, hand);
+            if (!IsVR && context.control.device is Mouse)
+            {
+                // Resuming clears old commands, so resume BEFORE storing this new shot.
+                DesktopPlayRequested?.Invoke();
+                CaptureMouse();
+            }
+            bool mouse = context.control.device is Mouse;
+            Enqueue(mouse && desktopToggleWeb ? SwingCommandKind.ToggleWeb : SwingCommandKind.Attach, hand, mouse);
+        }
+        void Release(InputAction.CallbackContext context, SwingHand hand)
+        {
+            if (context.control.device is Mouse && desktopToggleWeb) return;
+            Enqueue(SwingCommandKind.Release, hand);
         }
         public void SetDesktopMenuOpen(bool open)
         {
@@ -125,10 +144,10 @@ namespace VRWebSwing
             if (IsVR) return;
             if (open) ReleaseMouse(); else CaptureMouse();
         }
-        public void Enqueue(SwingCommandKind kind, SwingHand hand = SwingHand.Right)
+        public void Enqueue(SwingCommandKind kind, SwingHand hand = SwingHand.Right, bool desktopAim = false)
         {
-            if (kind == SwingCommandKind.Attach) PreviewHand = hand;
-            commands.Enqueue(new SwingCommand { kind = kind, hand = hand, ray = Aim(hand) });
+            if (kind == SwingCommandKind.Attach || kind == SwingCommandKind.ToggleWeb) PreviewHand = hand;
+            commands.Enqueue(new SwingCommand { kind = kind, hand = hand, ray = desktopAim ? new Ray(head.position, head.forward) : Aim(hand) });
         }
         public bool TryConsume(out SwingCommand command)
         {
@@ -153,14 +172,7 @@ namespace VRWebSwing
             : new Ray(head.position, head.forward);
         void Update()
         {
-            bool vr = !forceDesktop && UnityEngine.XR.InputDevices.GetDeviceAtXRNode(XRNode.Head).isValid;
-            if (vr != IsVR)
-            {
-                IsVR = vr; Clear();
-                headTracking.enabled = leftTracking.enabled = rightTracking.enabled = vr;
-                if (vr) ReleaseMouse();
-                if (!vr) { head.localPosition = new Vector3(0, 1.65f, 0); yaw = pitch = 0; }
-            }
+            RefreshTrackingMode(true);
             Move = Vector2.ClampMagnitude(move.ReadValue<Vector2>(), 1);
             if (IsVR) return;
             if (DesktopMenuOpen) return;
@@ -178,6 +190,28 @@ namespace VRWebSwing
         {
             hand.position = head.TransformPoint(new Vector3(x, -0.2f, 0.3f));
             hand.rotation = head.rotation;
+        }
+        void RefreshTrackingMode(bool clearPending)
+        {
+            if (!trackingModeInitialized || Time.unscaledTime >= nextDisplayRefresh)
+            {
+                SubsystemManager.GetSubsystems(displays);
+                nextDisplayRefresh = Time.unscaledTime + 1;
+            }
+            bool runningDisplay = false;
+            for (int i = 0; i < displays.Count; ++i) runningDisplay |= displays[i].running;
+            // A simulator/stale head device without XR rendering must not disable desktop aiming.
+            bool vr = !forceDesktop && runningDisplay && UnityEngine.XR.InputDevices.GetDeviceAtXRNode(XRNode.Head).isValid;
+            if (trackingModeInitialized && vr == IsVR) return;
+            bool wasVR = IsVR;
+            IsVR = vr;
+            if (trackingModeInitialized && clearPending) Clear();
+            if (headTracking) headTracking.enabled = vr;
+            if (leftTracking) leftTracking.enabled = vr;
+            if (rightTracking) rightTracking.enabled = vr;
+            if (vr) ReleaseMouse();
+            else if (wasVR) { head.localPosition = new Vector3(0, 1.65f, 0); yaw = pitch = 0; }
+            trackingModeInitialized = true;
         }
     }
 }

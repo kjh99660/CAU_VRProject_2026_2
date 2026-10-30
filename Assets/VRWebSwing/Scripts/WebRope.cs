@@ -9,7 +9,7 @@ namespace VRWebSwing
         public SwingInput input;
         public LineRenderer line;
         public Transform aimMarker;
-        [Tooltip("Static attachable surfaces. Walls outside this mask still occlude aiming.")] public LayerMask attachMask;
+        [Tooltip("Static attachable surfaces. Walls outside this mask still occlude aiming.")] public LayerMask attachMask = 1 << 8;
         public bool Attached { get; private set; }
         public Vector3 Anchor { get; private set; }
         public Transform AnchorSurface { get; private set; }
@@ -25,6 +25,14 @@ namespace VRWebSwing
         public int StateVersion { get; private set; }
         public int SuccessfulShots { get; private set; }
         public int FailedShots { get; private set; }
+
+        void Awake()
+        {
+            // Layer 8 is the endless demo's explicit building-layer contract. None cannot fire at any surface.
+            var motor = GetComponent<SwingMotor>();
+            if (attachMask.value == 0 && motor && motor.course && motor.course.IsEndless)
+                attachMask = 1 << 8;
+        }
 
         public bool FindAnchor(Ray ray, out RaycastHit hit)
         {
