@@ -19,8 +19,10 @@ namespace VRWebSwing
     // Update callbacks enqueue edges (and their original aim rays); FixedUpdate drains in order.
     public sealed class SwingInput : MonoBehaviour
     {
+        public bool aimMode = false;
+        public Transform leftAim, rightAim;
         public Transform head, leftHand, rightHand;
-        public TrackedPoseDriver headTracking, leftTracking, rightTracking;
+        public TrackedPoseDriver headTracking, leftTracking,leftAimTracking, rightTracking, rightAimTracking;
         public bool forceDesktop;
         [Tooltip("Desktop mouse look sensitivity in degrees per pixel.")] [Min(0.001f)] public float mouseSensitivity = 0.1f;
         [Tooltip("Capture the mouse automatically when Play starts without an HMD.")] public bool captureMouseOnStart = true;
@@ -165,7 +167,9 @@ namespace VRWebSwing
                 commands.Enqueue(command);
             }
         }
-        public Transform Hand(SwingHand hand) => hand == SwingHand.Left ? leftHand : rightHand;
+        public Transform Hand(SwingHand hand) => aimMode
+            ? hand == SwingHand.Left ? leftAim : rightAim 
+            : hand == SwingHand.Left ? leftHand : rightHand;
         // Desktop shots follow the screen-center crosshair; the rendered web still starts at its hand.
         public Ray Aim(SwingHand hand) => IsVR
             ? new Ray(Hand(hand).position, Hand(hand).forward)
@@ -207,8 +211,16 @@ namespace VRWebSwing
             IsVR = vr;
             if (trackingModeInitialized && clearPending) Clear();
             if (headTracking) headTracking.enabled = vr;
-            if (leftTracking) leftTracking.enabled = vr;
-            if (rightTracking) rightTracking.enabled = vr;
+            if (aimMode)
+            {
+                if (leftTracking) leftAimTracking.enabled = vr;
+                if (rightTracking) rightAimTracking.enabled = vr;
+            }
+            else
+            {
+                if (leftTracking) leftTracking.enabled = vr;
+                if (rightTracking) rightTracking.enabled = vr;
+            }
             if (vr) ReleaseMouse();
             else if (wasVR) { head.localPosition = new Vector3(0, 1.65f, 0); yaw = pitch = 0; }
             trackingModeInitialized = true;
