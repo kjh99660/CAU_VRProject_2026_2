@@ -5,10 +5,12 @@ namespace VRWebSwing
     [DefaultExecutionOrder(200)]
     public sealed class WebRope : MonoBehaviour
     {
+
         public SwingSettings settings;
         public SwingInput input;
         public LineRenderer line;
         public Transform aimMarker;
+        
         [Tooltip("Static attachable surfaces. Walls outside this mask still occlude aiming.")] public LayerMask attachMask = 1 << 8;
         public bool Attached { get; private set; }
         public Vector3 Anchor { get; private set; }
@@ -51,6 +53,7 @@ namespace VRWebSwing
             PlanFloorReel(pivot, hit.normal);
             ++StateVersion; ++SuccessfulShots; Status = "Attached: " + hand; return true;
         }
+
         void PlanFloorReel(Vector3 pivot, Vector3 surfaceNormal)
         {
             TargetLength = Length; HasFloorSample = FloorClearanceLimited = false; SampledFloorY = 0;
