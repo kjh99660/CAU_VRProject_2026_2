@@ -5,11 +5,13 @@ namespace VRWebSwing
     [DefaultExecutionOrder(200)]
     public sealed class WebRope : MonoBehaviour
     {
+        public Transform aimMarkerL, aimMarkerR, aimMarker;
+        public LineRenderer LaserL, LaserR;
+        // 좌우변수
 
         public SwingSettings settings;
         public SwingInput input;
         public LineRenderer line;
-        public Transform aimMarker;
         
         [Tooltip("Static attachable surfaces. Walls outside this mask still occlude aiming.")] public LayerMask attachMask = 1 << 8;
         public bool Attached { get; private set; }
@@ -23,6 +25,11 @@ namespace VRWebSwing
         public bool Reeling => Attached && settings.autoShortenForFloor && TargetLength < Length - 0.001f;
         public SwingHand Owner { get; private set; }
         public string Status { get; private set; } = "Ready";
+        
+        public bool CanAttachL { get; private set; }
+        public bool CanAttachR { get; private set; }
+        // 좌우변수
+
         public bool CanAttach { get; private set; }
         public int StateVersion { get; private set; }
         public int SuccessfulShots { get; private set; }
@@ -69,6 +76,8 @@ namespace VRWebSwing
             FloorClearanceLimited = allowed < settings.minRopeLength;
             TargetLength = RopeMath.FloorLimitedLength(Length, Anchor.y, SampledFloorY,
                 settings.pivotHeight, settings.floorClearance, settings.minRopeLength);
+
+
         }
         void SampleFloor(Vector3 column)
         {
@@ -92,15 +101,37 @@ namespace VRWebSwing
         public void ShiftOrigin(Vector3 offset)
         {
             if (Attached) Anchor -= offset;
-            if (aimMarker) aimMarker.position -= offset;
+            //if (aimMarker) aimMarker.position -= offset;
+            if (aimMarkerL) aimMarkerL.position -= offset;
+            if (aimMarkerR) aimMarkerR.position -= offset;
         }
         void LateUpdate()
         {
+            //line.enabled = Attached;
+            //if (Attached) { line.SetPosition(0, input.Hand(Owner).position); line.SetPosition(1, Anchor); }
+            ////CanAttach = FindAnchor(input.Aim(input.PreviewHand), out RaycastHit hit);
+            //aimMarker.gameObject.SetActive(CanAttach);
+            //if (CanAttach) aimMarker.position = hit.point + hit.normal * 0.04f;
+
+            RaycastHit hitL = default;
+            RaycastHit hitR = default;
+
             line.enabled = Attached;
             if (Attached) { line.SetPosition(0, input.Hand(Owner).position); line.SetPosition(1, Anchor); }
-            CanAttach = FindAnchor(input.Aim(input.PreviewHand), out RaycastHit hit);
-            aimMarker.gameObject.SetActive(CanAttach);
-            if (CanAttach) aimMarker.position = hit.point + hit.normal * 0.04f;
+
+            if (Attached == true && Owner == SwingHand.Left) { aimMarkerL.GetComponent<MeshRenderer>().enabled = false; LaserL.enabled = false; }
+            else { aimMarkerL.GetComponent<MeshRenderer>().enabled = true; LaserL.enabled = true; }
+            CanAttachL = FindAnchor(input.Aim(SwingHand.Left), out hitL);
+
+            if (Attached == true && Owner == SwingHand.Right) { aimMarkerR.GetComponent<MeshRenderer>().enabled = false; LaserR.enabled = false; }
+            else { aimMarkerR.GetComponent<MeshRenderer>().enabled = true; LaserR.enabled = true; }
+            CanAttachR = FindAnchor(input.Aim(SwingHand.Right), out hitR);
+            CanAttach = CanAttachL || CanAttachR;
+
+            aimMarkerL.gameObject.SetActive(CanAttachL);
+            aimMarkerR.gameObject.SetActive(CanAttachR);
+            if (CanAttachL) aimMarkerL.position = hitL.point + hitL.normal * 0.04f;
+            if (CanAttachR) aimMarkerR.position = hitR.point + hitR.normal * 0.04f;
         }
         void OnDisable() { Detach("Disabled"); if (line) line.enabled = false; }
         void OnDrawGizmosSelected()
