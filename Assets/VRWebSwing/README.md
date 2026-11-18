@@ -2,6 +2,25 @@
 
 현재 기본 실행 씬은 **바닥 없는 무한 건물 맵**이다. 시작 플랫폼만 유지하고 기존 중간 플랫폼/체크포인트는 기본 씬에서 제거했다. 원래 유한 코스는 `Scenes/WebSwingValidation.unity`에 검증용으로 보존했다. 아래 과거 코스 설명은 이 검증 씬에 해당하며, 현재 플레이 방법은 다음 무한 맵 절을 기준으로 한다.
 
+## 무한 맵 기믹 배치 (2026-11-18)
+
+`Endless City` Inspector의 **Gimmicks** 항목에 `Prefabs/Gimmick/` 프리팹을 등록하면 무한 통로에 기믹 구간이 섞인다. 목록이 비어 있으면 기존과 동일하게 도시 구간만 반복한다.
+
+- 배치 규칙: 도시 구간 `City Segments Between Gimmicks`개(기본 1) → 기믹 1개를 반복한다. 처음에는 등록 순서대로 한 번씩, 이후에는 같은 규칙을 유지하며 랜덤으로 고른다(가능하면 직전과 같은 기믹은 피함). `Random Seed`가 0이면 매 시도마다 순서가 바뀐다.
+- 기믹별 설정: `Length`(프리팹이 차지하는 전진 길이, 기본 24m), `Space Before`/`Space After`(앞뒤 빈 공간, m). 프리팹 루트는 통로 중앙(X=0, Y=0)에 놓이고 +Z가 진행 방향이다. 빈 공간에는 건물이 없으므로 줄 최대 길이(40m)를 고려해 정한다.
+- 풀링: 기믹마다 `Gimmick Prewarm Count`개를 시작 시 만들어 재사용한다. 같은 기믹이 동시에 더 많이 보여야 할 때만 풀이 늘어난다. 원점 이동·줄이 걸린 구간 보호는 도시 구간과 동일하게 적용된다.
+- 기믹 스크립트는 풀 재사용을 위해 `OnEnable`에서 상태를 초기화한다(이동 발판·레이저는 부모 기준 로컬 좌표, 깨지는 앵커는 Destroy 대신 비활성화).
+
+검증: `dotnet build`로 컴파일만 확인했다. Play 실행·테스트는 미검증이다. 기믹을 등록하면 기존 `EndlessCityRuntimeTests`의 "24m 균일 구간" 가정이 맞지 않으므로 테스트는 기믹 목록이 빈 상태 기준이다.
+
+## 추격 벽과 위험 비네트 (2026-11-18)
+
+- `Endless City > Back Wall Prefab`(루트에 `Gimmick/BackWall.cs`)을 지정하면, 등록 순서의 기믹을 모두 지나 랜덤 구간에 들어설 때 플레이어 뒤 `Back Wall Spawn Distance`(30m)에 벽이 생긴다. 벽은 `Speed`(8m/s)로 +Z 이동하고, 앞면이 몸 뒤쪽에 닿으면 `GameEvents.OnPlayerDeath("BackWall")` 후 낙사와 같이 재시작한다. 판정은 Z 좌표 비교라 충돌체가 필요 없다.
+- 벽 생성 시 `EndlessCity.BackWallSpawned` 이벤트로 `DangerVignette`가 1.5~3초(기본 2초) 붉은 가장자리 비네트를 한 번 재생한다. XRI 반구 메시를 머리에 고정해 쓰며 최대 불투명도 0.45로 화면이 비쳐 보인다. 멀미 비교용 `SwingComfort` 비네트와는 별개다.
+- 씬 연결: 메뉴 **VR Web Swing > Add Danger Vignette** (머리 아래 오브젝트·`Settings/DangerVignette.mat` 생성, 재실행해도 중복 생성 없음).
+
+검증: `dotnet build`로 런타임·Editor 어셈블리 컴파일만 확인했다. 셰이더 컴파일, Play, HMD 표시는 미검증이다.
+
 ## 이미지 스카이박스 (2026-10-30)
 
 `Art/Skybox/SKYBOX.jpg`는 제공된 원본 JPG를 바이트 변경 없이 복사한 파일이다. `CloudSkybox.mat`와 URP `ImageSkybox.shader`를 만들어 기본 씬의 RenderSettings.skybox에 연결했다. 카메라 Clear Flags는 Skybox를 사용하고 기존 조명·이동·충돌 설정은 유지했다. 새로 만든 씬에는 **VR Web Swing > Apply Image Skybox**로 적용할 수 있다.

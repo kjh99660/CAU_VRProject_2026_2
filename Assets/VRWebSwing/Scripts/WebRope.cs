@@ -58,7 +58,9 @@ namespace VRWebSwing
             Anchor = hit.point; Length = distance; Owner = hand; Attached = true;
             AnchorSurface = hit.collider.transform;
             PlanFloorReel(pivot, hit.normal);
-            ++StateVersion; ++SuccessfulShots; Status = "Attached: " + hand; return true;
+            ++StateVersion; ++SuccessfulShots; Status = "Attached: " + hand;
+            if (hit.collider.TryGetComponent(out FragileAnchor fragile)) fragile.OnRopeAttached(this);
+            return true;
         }
 
         void PlanFloorReel(Vector3 pivot, Vector3 surfaceNormal)

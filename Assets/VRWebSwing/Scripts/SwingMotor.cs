@@ -30,6 +30,8 @@ namespace VRWebSwing
         public Vector3 Pivot => transform.position + Vector3.up * settings.pivotHeight;
         CharacterController body;
         float correctionUsed;
+        readonly RaycastHit[] hazardHits = new RaycastHit[16];
+        readonly Collider[] hazardOverlaps = new Collider[16];
         void Awake() { body = GetComponent<CharacterController>(); }
         void FixedUpdate()
         {
@@ -87,7 +89,34 @@ namespace VRWebSwing
             Vector3 beforeReel = transform.position;
             ApplyFloorReel(dt);
             if (course.CheckSegment(beforeReel, transform.position)) return;
+            if (TouchesHazard(PreviousPosition, transform.position)) { course.Respawn(); return; }
             if (transform.position.y < settings.failHeight) course.Respawn();
+        }
+        // Thin hazard triggers (lasers) can be skipped by a 0.7m step, so sweep the whole frame path plus the end pose.
+        bool TouchesHazard(Vector3 from, Vector3 to)
+        {
+            float half = Mathf.Max(0, body.height * 0.5f - body.radius);
+            Vector3 top = from + body.center + Vector3.up * half, bottom = from + body.center - Vector3.up * half;
+            Vector3 delta = to - from;
+            float distance = delta.magnitude;
+            if (distance > 0.0001f)
+            {
+                int count = Physics.CapsuleCastNonAlloc(top, bottom, body.radius, delta / distance, hazardHits, distance,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
+                for (int i = 0; i < count; ++i)
+                    if (HitHazard(hazardHits[i].collider)) return true;
+            }
+            int overlaps = Physics.OverlapCapsuleNonAlloc(top + delta, bottom + delta, body.radius, hazardOverlaps,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < overlaps; ++i)
+                if (HitHazard(hazardOverlaps[i])) return true;
+            return false;
+        }
+        static bool HitHazard(Collider collider)
+        {
+            if (!collider || !collider.isTrigger || !collider.TryGetComponent(out LaserTrigger laser)) return false;
+            laser.OnPlayerHit();
+            return true;
         }
         void ApplyFloorReel(float dt)
         {
