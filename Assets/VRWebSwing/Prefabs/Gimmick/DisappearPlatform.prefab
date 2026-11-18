@@ -163,7 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35cca8322b0669049bd075fbd438dae1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: VRWebSwing::FragileAnchor
-  destroyDelay: 1.5
+  destroyDelay: 5
 --- !u!1001 &3677363320027473743
 PrefabInstance:
   m_ObjectHideFlags: 0

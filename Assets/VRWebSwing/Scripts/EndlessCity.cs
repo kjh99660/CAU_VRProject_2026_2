@@ -10,6 +10,7 @@ namespace VRWebSwing
         [Tooltip("Forward length in meters occupied by the prefab itself, measured from its root.")] [Min(0)] public float length = 24;
         [Tooltip("Empty gap in meters before the prefab, after the previous segment.")] [Min(0)] public float spaceBefore;
         [Tooltip("Empty gap in meters after the prefab, before the next segment.")] [Min(0)] public float spaceAfter;
+        [Tooltip("How many times this gimmick appears back to back each time it is chosen (no city segments between copies).")] [Min(1)] public int repeatCount = 1;
         public float SlotLength => spaceBefore + length + spaceAfter;
     }
 
@@ -57,6 +58,8 @@ namespace VRWebSwing
         System.Random random;
         int orderedCursor, lastGimmick, citiesSinceGimmick;
         long lastOrderedSlot = -1;
+        int repeatRemaining;
+        bool finalOrderedGroup;
         long[] indices;
         long lastCenter = long.MinValue;
         int lastRopeVersion = -1;
@@ -226,6 +229,7 @@ namespace VRWebSwing
         {
             random = new System.Random(randomSeed != 0 ? randomSeed : System.Environment.TickCount);
             slots.Clear(); orderedCursor = 0; lastGimmick = -1; citiesSinceGimmick = 0; lastOrderedSlot = -1;
+            repeatRemaining = 0; finalOrderedGroup = false;
             AppendSlot();
         }
         void EnsureSlots(long index) { while (slots.Count <= index) AppendSlot(); }
@@ -238,13 +242,20 @@ namespace VRWebSwing
         }
         int NextKind()
         {
+            // Finish the current run of back-to-back copies first; no city segments between them.
+            if (repeatRemaining > 0)
+            {
+                --repeatRemaining;
+                if (repeatRemaining == 0 && finalOrderedGroup) { lastOrderedSlot = slots.Count; finalOrderedGroup = false; }
+                return lastGimmick;
+            }
             if (validGimmicks.Length == 0 || citiesSinceGimmick < citySegmentsBetweenGimmicks) { ++citiesSinceGimmick; return -1; }
             citiesSinceGimmick = 0;
             int kind;
             if (orderedCursor < validGimmicks.Length)
             {
                 kind = validGimmicks[orderedCursor++];
-                if (orderedCursor == validGimmicks.Length) lastOrderedSlot = slots.Count; // index of the slot being appended
+                finalOrderedGroup = orderedCursor == validGimmicks.Length;
             }
             else
             {
@@ -254,6 +265,9 @@ namespace VRWebSwing
                 if (validGimmicks.Length > 1 && lastGimmick >= 0 && kind == lastGimmick) kind = validGimmicks[validGimmicks.Length - 1];
             }
             lastGimmick = kind;
+            repeatRemaining = Mathf.Max(1, gimmicks[kind].repeatCount) - 1;
+            // The random section (and the chasing wall) starts after the last copy of the last in-order gimmick.
+            if (repeatRemaining == 0 && finalOrderedGroup) { lastOrderedSlot = slots.Count; finalOrderedGroup = false; }
             return kind;
         }
         bool IsPinned(Transform root)
