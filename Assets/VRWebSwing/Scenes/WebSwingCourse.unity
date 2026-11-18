@@ -1043,7 +1043,7 @@ MonoBehaviour:
     spaceBefore: 5
     spaceAfter: 0
   - prefab: {fileID: 4346851110722374101, guid: 6206fffebea06424abfe50a8c6e88c69, type: 3}
-    length: 24
+    length: 12
     spaceBefore: 0
     spaceAfter: 0
   citySegmentsBetweenGimmicks: 2

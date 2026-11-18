@@ -1,11 +1,11 @@
-using System.Collections;
 using UnityEngine;
+using VRWebSwing;
 
 public class FragileAnchor : MonoBehaviour
 {
     [Header("Fragile Settings")]
-    [Tooltip("로프가 부착된 후 완전히 파괴되기까지 걸리는 시간(초)")]
-    public float destroyDelay = 1.5f;
+    [Tooltip("로프가 처음 연결된 뒤 블록이 부서지기까지 걸리는 시간(초). 이 동안 색이 빨갛게 변한다.")]
+    [Min(0)] public float destroyDelay = 1.5f;
 
     private MeshRenderer meshRenderer;
     private Collider anchorCollider;
@@ -13,6 +13,10 @@ public class FragileAnchor : MonoBehaviour
 
     // 중복 실행을 막기 위한 상태 플래그
     private bool isTriggered = false;
+    private bool isBroken = false;
+    private float elapsed;
+    private WebRope rope;
+    private SwingMotor motor;
 
     void Awake()
     {
@@ -25,52 +29,46 @@ public class FragileAnchor : MonoBehaviour
     void OnEnable()
     {
         isTriggered = false;
+        isBroken = false;
+        elapsed = 0f;
+        rope = null;
+        motor = null;
         meshRenderer.enabled = true;
         meshRenderer.material.color = originalColor;
         if (anchorCollider) anchorCollider.enabled = true;
     }
 
-
-    // ==========================================
-    // 방법 1: 외부(플레이어/로프 매니저)에서 Raycast 등으로 타겟을 잡고 직접 호출할 때 (추천)
-    // ==========================================
-    public void OnRopeAttached()
+    // WebRope가 이 블록에 연결에 성공했을 때 호출한다. 첫 연결부터 타이머가 시작된다.
+    public void OnRopeAttached(WebRope attachedRope)
     {
-        if (!isTriggered)
-        {
-            isTriggered = true;
-            StartCoroutine(BreakAnchorRoutine());
-        }
+        rope = attachedRope;
+        if (rope) motor = rope.GetComponent<SwingMotor>();
+        if (isTriggered || isBroken) return;
+        isTriggered = true;
+        elapsed = 0f;
     }
 
-    // ==========================================
-    // 방법 2: 물리적 트리거로 감지할 때 (갈고리 발사체 오브젝트가 직접 날아와 닿을 때)
-    // ==========================================
-    private void OnTriggerEnter(Collider other)
+    // 메뉴/중단으로 일시정지(motor.Paused)된 동안에는 타이머가 흐르지 않도록 물리 주기에서 센다.
+    void FixedUpdate()
     {
-        // TODO: 태그나 레이어를 통해 플레이어의 로프/갈고리가 맞는지 확인하는 조건문 필요
-        if (other.CompareTag("PlayerHook") && !isTriggered)
-        {
-            isTriggered = true;
-            StartCoroutine(BreakAnchorRoutine());
-        }
+        if (!isTriggered || isBroken) return;
+        if (motor && motor.Paused) return;
+
+        elapsed += Time.fixedDeltaTime;
+        float t = destroyDelay > 0f ? Mathf.Clamp01(elapsed / destroyDelay) : 1f;
+        meshRenderer.material.color = Color.Lerp(originalColor, Color.red, t);
+        if (elapsed >= destroyDelay) Break();
     }
 
-    // 파괴 타이머 코루틴
-    private IEnumerator BreakAnchorRoutine()
+    private void Break()
     {
-        float elapsed = 0f;
-        while (elapsed < destroyDelay)
-        {
-            elapsed += Time.deltaTime;
-            meshRenderer.material.color = Color.Lerp(originalColor, Color.red, elapsed / destroyDelay);
-            yield return null;
-        }
-        yield return new WaitForSeconds(destroyDelay);
+        isBroken = true;
 
-        // TODO: (필수) 플레이어 측의 로프 연결을 강제로 해제하는 로직 호출
+        // 아직 이 블록에 줄이 걸려 있으면 끊는다. 다른 곳으로 옮겨 건 줄은 유지한다.
+        if (rope && rope.Attached && rope.AnchorSurface == transform)
+            rope.Detach("Fragile anchor broke");
 
-        // 발판 파괴: 오브젝트 풀에서 재사용하므로 Destroy 대신 렌더러와 충돌체만 끈다.
+        // 오브젝트 풀에서 재사용하므로 Destroy 대신 렌더러와 충돌체만 끈다.
         meshRenderer.enabled = false;
         if (anchorCollider) anchorCollider.enabled = false;
     }
