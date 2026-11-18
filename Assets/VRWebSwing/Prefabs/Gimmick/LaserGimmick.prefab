@@ -196,7 +196,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: VRWebSwing::LaserGenerator
   width: 12
-  height: 20
+  settings: {fileID: 11400000, guid: 1f9bed1baa94e4a4a9debe114b7f96a3, type: 2}
+  failHeightMargin: 4
+  minHeight: -9
+  maxHeight: 16
   laserThickness: 0.1
   coreMaterial: {fileID: 2100000, guid: e31b0f05772f6a84cb9b3dd8e5592041, type: 2}
   glowMaterial: {fileID: 2100000, guid: 4c6b66a8a8f3a8c43b15844752186399, type: 2}
