@@ -8,15 +8,26 @@ public class FragileAnchor : MonoBehaviour
     public float destroyDelay = 1.5f;
 
     private MeshRenderer meshRenderer;
+    private Collider anchorCollider;
     private Color originalColor;
 
     // 중복 실행을 막기 위한 상태 플래그
     private bool isTriggered = false;
 
-    void Start()
+    void Awake()
     {
         meshRenderer = GetComponent<MeshRenderer>();
+        anchorCollider = GetComponent<Collider>();
         originalColor = meshRenderer.material.color;
+    }
+
+    // 무한 맵 풀에서 재사용될 때 부서지기 전 상태로 복구한다.
+    void OnEnable()
+    {
+        isTriggered = false;
+        meshRenderer.enabled = true;
+        meshRenderer.material.color = originalColor;
+        if (anchorCollider) anchorCollider.enabled = true;
     }
 
 
@@ -59,7 +70,8 @@ public class FragileAnchor : MonoBehaviour
 
         // TODO: (필수) 플레이어 측의 로프 연결을 강제로 해제하는 로직 호출
 
-        // 발판 파괴 (오브젝트 풀링을 사용한다면 gameObject.SetActive(false)로 변경)
-        Destroy(gameObject);
+        // 발판 파괴: 오브젝트 풀에서 재사용하므로 Destroy 대신 렌더러와 충돌체만 끈다.
+        meshRenderer.enabled = false;
+        if (anchorCollider) anchorCollider.enabled = false;
     }
 }

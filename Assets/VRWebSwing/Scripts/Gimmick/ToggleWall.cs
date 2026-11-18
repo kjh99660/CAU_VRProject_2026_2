@@ -6,10 +6,10 @@ public class ToggleWall : MonoBehaviour
     [Header("Toggle Settings")]
     [Tooltip("다른 벽들과 타이밍을 엇갈리게 하기 위한 초기 대기 시간")]
     public float timeOffset = 0f;
-    
+
     [Tooltip("벽이 켜져 있는 시간")]
     public float activeDuration = 2.0f;
-    
+
     [Tooltip("벽이 꺼져 있는 시간")]
     public float inactiveDuration = 2.0f;
 
@@ -17,10 +17,19 @@ public class ToggleWall : MonoBehaviour
     [Tooltip("실제로 껐다 켤 자식 오브젝트 (MeshRenderer와 Collider가 있는 오브젝트)")]
     public GameObject targetWall;
 
-    void Start()
+    private bool initialWallActive;
+
+    void Awake()
+    {
+        if (targetWall != null) initialWallActive = targetWall.activeSelf;
+    }
+
+    // 무한 맵 풀에서 비활성화되면 코루틴이 멈추므로, 다시 켜질 때마다 처음부터 시작한다.
+    void OnEnable()
     {
         if (targetWall != null)
         {
+            targetWall.SetActive(initialWallActive);
             StartCoroutine(ToggleRoutine());
         }
         else

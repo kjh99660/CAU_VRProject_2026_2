@@ -38,17 +38,21 @@ public class LaserGenerator : MonoBehaviour
         laserObj.transform.rotation = Quaternion.FromToRotation(Vector3.right, endPoint - startPoint);
         laserObj.AddComponent<LaserTrigger>();
 
+        // 선은 laserObj 기준 로컬 좌표(X축 방향)로 그린다.
+        Vector3 localStart = new Vector3(-distance / 2f, 0, 0);
+        Vector3 localEnd = new Vector3(distance / 2f, 0, 0);
+
         // 2. 외곽 빛번짐 (Glow) 그리기
         GameObject glowObj = new GameObject("LaserGlow");
-        glowObj.transform.SetParent(laserObj.transform);
+        glowObj.transform.SetParent(laserObj.transform, false);
         LineRenderer glowLine = glowObj.AddComponent<LineRenderer>();
-        SetupLineRenderer(glowLine, startPoint, endPoint, laserThickness * 2.5f, glowMaterial);
+        SetupLineRenderer(glowLine, localStart, localEnd, laserThickness * 2.5f, glowMaterial);
 
         // 3. 중심 심지 (Core) 그리기
         GameObject coreObj = new GameObject("LaserCore");
-        coreObj.transform.SetParent(laserObj.transform);
+        coreObj.transform.SetParent(laserObj.transform, false);
         LineRenderer coreLine = coreObj.AddComponent<LineRenderer>();
-        SetupLineRenderer(coreLine, startPoint, endPoint, laserThickness * 0.4f, coreMaterial);
+        SetupLineRenderer(coreLine, localStart, localEnd, laserThickness * 0.4f, coreMaterial);
     }
 
     // LineRenderer 중복 세팅 코드를 분리하여 깔끔하게 정리
@@ -60,6 +64,7 @@ public class LaserGenerator : MonoBehaviour
         line.startWidth = width;
         line.endWidth = width;
         line.material = mat;
-        line.useWorldSpace = true;
+        // 무한 맵 풀링/원점 이동 때 부모와 함께 움직이도록 로컬 좌표를 사용한다.
+        line.useWorldSpace = false;
     }
-}
+}

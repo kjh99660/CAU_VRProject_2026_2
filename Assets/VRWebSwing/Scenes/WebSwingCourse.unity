@@ -710,6 +710,7 @@ MonoBehaviour:
   forceDesktop: 0
   mouseSensitivity: 0.1
   captureMouseOnStart: 1
+  desktopToggleWeb: 1
 --- !u!114 &694319299
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1024,6 +1025,30 @@ MonoBehaviour:
   - {fileID: 2042238786}
   - {fileID: 1883136}
   - {fileID: 193520530}
+  gimmicks:
+  - prefab: {fileID: 2400115806672392549, guid: 69e16db5eb992b74bbf4eaee19f99c8b, type: 3}
+    length: 24
+    spaceBefore: 5
+    spaceAfter: 0
+  - prefab: {fileID: 2400115806672392549, guid: eb8d0497eb68d6f48a2c7fd63ccf45aa, type: 3}
+    length: 24
+    spaceBefore: 30
+    spaceAfter: 0
+  - prefab: {fileID: 2400115806672392549, guid: b49e8ddb51e79df4a8db5e8ec00437e9, type: 3}
+    length: 24
+    spaceBefore: 5
+    spaceAfter: 0
+  - prefab: {fileID: 2400115806672392549, guid: 90d0f175b5e1d91479113b68cec150a4, type: 3}
+    length: 24
+    spaceBefore: 5
+    spaceAfter: 0
+  - prefab: {fileID: 4346851110722374101, guid: 6206fffebea06424abfe50a8c6e88c69, type: 3}
+    length: 24
+    spaceBefore: 0
+    spaceAfter: 0
+  citySegmentsBetweenGimmicks: 2
+  randomSeed: 0
+  gimmickPrewarmCount: 2
 --- !u!4 &1095294136
 Transform:
   m_ObjectHideFlags: 0
