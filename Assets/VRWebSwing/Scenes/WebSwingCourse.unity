@@ -1933,6 +1933,7 @@ GameObject:
   - component: {fileID: 1247361833}
   - component: {fileID: 1247361832}
   - component: {fileID: 1247361835}
+  - component: {fileID: 1247361836}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2131,7 +2132,7 @@ MonoBehaviour:
   m_RequiresOpaqueTextureOption: 2
   m_CameraType: 0
   m_Cameras: []
-  m_RendererIndex: -1
+  m_RendererIndex: 1
   m_VolumeLayerMask:
     serializedVersion: 2
     m_Bits: 1
@@ -2158,6 +2159,30 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &1247361836
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1247361830}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e032c2fa99906a4eb61574ebbaea1dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: VRWebSwing::XRScreenEffects
+  fogEnabled: 1
+  fogStartDistance: 60
+  fogEndDistance: 120.01
+  fogDensity: 0.85
+  fogColor: {r: 0.65, g: 0.7, b: 0.75, a: 1}
+  fogSkybox: 0
+  vignetteEnabled: 1
+  vignetteIntensity: 0.7
+  vignetteRadius: 1.12
+  vignetteSoftness: 0.6
+  vignetteCenter: {x: 0.5, y: 0.5}
+  vignetteColor: {r: 0.754717, g: 0, b: 0, a: 1}
 --- !u!1 &1278649295
 GameObject:
   m_ObjectHideFlags: 0
