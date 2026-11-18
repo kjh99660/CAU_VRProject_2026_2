@@ -32,6 +32,12 @@ namespace VRWebSwing
         [Tooltip("City segments placed before each gimmick, including before the first one.")] [Range(1, 8)] public int citySegmentsBetweenGimmicks = 1;
         [Tooltip("Random order seed. 0 = a new order on every run.")] public int randomSeed;
         [Tooltip("Inactive instances created per gimmick at start. The pool grows only if more are visible at once.")] [Range(1, 8)] public int gimmickPrewarmCount = 2;
+        [Header("Chasing back wall")]
+        [Tooltip("Prefab with a BackWall component. Spawned once the player passes the last in-order gimmick (random section starts). Empty = no wall.")] public BackWall backWallPrefab;
+        [Tooltip("Distance in meters behind the player where the wall appears.")] [Min(0)] public float backWallSpawnDistance = 30;
+        public BackWall BackWall { get; private set; }
+        /// <summary>Raised once per run when the chasing wall appears.</summary>
+        public event System.Action BackWallSpawned;
         public double OriginOffset { get; private set; }
         public int ActiveSegmentCount { get; private set; }
         public int ActiveGimmickCount { get; private set; }
@@ -50,6 +56,7 @@ namespace VRWebSwing
         int[] validGimmicks = new int[0];
         System.Random random;
         int orderedCursor, lastGimmick, citiesSinceGimmick;
+        long lastOrderedSlot = -1;
         long[] indices;
         long lastCenter = long.MinValue;
         int lastRopeVersion = -1;
@@ -79,6 +86,7 @@ namespace VRWebSwing
             validGimmicks = valid.ToArray();
             foreach (int kind in validGimmicks)
                 for (int n = 0; n < gimmickPrewarmCount; ++n) AddGimmickInstance(kind).gameObject.SetActive(false);
+            if (backWallPrefab) { BackWall = Instantiate(backWallPrefab, transform); BackWall.Deactivate(); }
             ResetSlots();
         }
         public void ResetRun()
@@ -87,6 +95,7 @@ namespace VRWebSwing
             startArea.position = initialStartPosition;
             for (int i = 0; i < indices.Length; ++i) indices[i] = long.MinValue;
             for (int i = 0; i < gimmickSlots.Count; ++i) gimmickSlots[i] = long.MinValue;
+            if (BackWall) BackWall.Deactivate();
             ResetSlots();
             // Teleport/reset will release the old tether; do not pin it during pool reset.
             course.motor.rope.Detach("New endless run");
@@ -100,7 +109,20 @@ namespace VRWebSwing
             if (Mathf.Abs(course.motor.transform.position.z) >= Mathf.Max(48, rebaseDistance)
                 || center != lastCenter || lastRopeVersion != course.motor.rope.StateVersion)
                 RefreshForPlayer();
+            // The random section starts after the last in-order gimmick; the wall chases from there on.
+            if (BackWall && !BackWall.Running && lastOrderedSlot >= 0 && center > lastOrderedSlot) SpawnBackWall();
         }
+        void SpawnBackWall()
+        {
+            Vector3 player = course.motor.transform.position;
+            BackWall.Activate(course.motor, new Vector3(0, 0, player.z - backWallSpawnDistance));
+            BackWallSpawned?.Invoke();
+        }
+        // Inspector ⋮ menu, Play mode only: spawn (or re-place) the chasing wall behind the player right now.
+        [ContextMenu("Spawn Back Wall Now")]
+        void ForceSpawnBackWall() => SpawnBackWall();
+        [ContextMenu("Spawn Back Wall Now", true)]
+        bool CanForceSpawnBackWall() => Application.isPlaying && BackWall && course && course.motor;
         long CenterIndex()
         {
             double d = LogicalZ(course.motor.transform.position.z) - initialStartZ;
@@ -127,6 +149,7 @@ namespace VRWebSwing
                 startArea.position -= offset;
                 for (int i = 0; i < segments.Length; ++i) segments[i].position -= offset;
                 for (int i = 0; i < gimmickObjects.Count; ++i) gimmickObjects[i].position -= offset;
+                if (BackWall) BackWall.transform.position -= offset;
                 course.motor.ShiftOrigin(offset);
             }
             lastCenter = CenterIndex(); lastRopeVersion = course.motor.rope.StateVersion;
@@ -202,7 +225,7 @@ namespace VRWebSwing
         void ResetSlots()
         {
             random = new System.Random(randomSeed != 0 ? randomSeed : System.Environment.TickCount);
-            slots.Clear(); orderedCursor = 0; lastGimmick = -1; citiesSinceGimmick = 0;
+            slots.Clear(); orderedCursor = 0; lastGimmick = -1; citiesSinceGimmick = 0; lastOrderedSlot = -1;
             AppendSlot();
         }
         void EnsureSlots(long index) { while (slots.Count <= index) AppendSlot(); }
@@ -218,7 +241,11 @@ namespace VRWebSwing
             if (validGimmicks.Length == 0 || citiesSinceGimmick < citySegmentsBetweenGimmicks) { ++citiesSinceGimmick; return -1; }
             citiesSinceGimmick = 0;
             int kind;
-            if (orderedCursor < validGimmicks.Length) kind = validGimmicks[orderedCursor++];
+            if (orderedCursor < validGimmicks.Length)
+            {
+                kind = validGimmicks[orderedCursor++];
+                if (orderedCursor == validGimmicks.Length) lastOrderedSlot = slots.Count; // index of the slot being appended
+            }
             else
             {
                 // Avoid the same gimmick twice in a row when there is a choice.

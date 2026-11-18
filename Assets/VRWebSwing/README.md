@@ -13,6 +13,14 @@
 
 검증: `dotnet build`로 컴파일만 확인했다. Play 실행·테스트는 미검증이다. 기믹을 등록하면 기존 `EndlessCityRuntimeTests`의 "24m 균일 구간" 가정이 맞지 않으므로 테스트는 기믹 목록이 빈 상태 기준이다.
 
+## 추격 벽과 위험 비네트 (2026-11-18)
+
+- `Endless City > Back Wall Prefab`(루트에 `Gimmick/BackWall.cs`)을 지정하면, 등록 순서의 기믹을 모두 지나 랜덤 구간에 들어설 때 플레이어 뒤 `Back Wall Spawn Distance`(30m)에 벽이 생긴다. 벽은 `Speed`(8m/s)로 +Z 이동하고, 앞면이 몸 뒤쪽에 닿으면 `GameEvents.OnPlayerDeath("BackWall")` 후 낙사와 같이 재시작한다. 판정은 Z 좌표 비교라 충돌체가 필요 없다.
+- 벽 생성 시 `EndlessCity.BackWallSpawned` 이벤트로 `DangerVignette`가 1.5~3초(기본 2초) 붉은 가장자리 비네트를 한 번 재생한다. XRI 반구 메시를 머리에 고정해 쓰며 최대 불투명도 0.45로 화면이 비쳐 보인다. 멀미 비교용 `SwingComfort` 비네트와는 별개다.
+- 씬 연결: 메뉴 **VR Web Swing > Add Danger Vignette** (머리 아래 오브젝트·`Settings/DangerVignette.mat` 생성, 재실행해도 중복 생성 없음).
+
+검증: `dotnet build`로 런타임·Editor 어셈블리 컴파일만 확인했다. 셰이더 컴파일, Play, HMD 표시는 미검증이다.
+
 ## 이미지 스카이박스 (2026-10-30)
 
 `Art/Skybox/SKYBOX.jpg`는 제공된 원본 JPG를 바이트 변경 없이 복사한 파일이다. `CloudSkybox.mat`와 URP `ImageSkybox.shader`를 만들어 기본 씬의 RenderSettings.skybox에 연결했다. 카메라 Clear Flags는 Skybox를 사용하고 기존 조명·이동·충돌 설정은 유지했다. 새로 만든 씬에는 **VR Web Swing > Apply Image Skybox**로 적용할 수 있다.
