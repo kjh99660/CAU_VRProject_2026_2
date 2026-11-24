@@ -36,6 +36,11 @@ namespace VRWebSwing
         [Header("Chasing back wall")]
         [Tooltip("Prefab with a BackWall component. Spawned once the player passes the last in-order gimmick (random section starts). Empty = no wall.")] public BackWall backWallPrefab;
         [Tooltip("Distance in meters behind the player where the wall appears.")] [Min(0)] public float backWallSpawnDistance = 30;
+        [Tooltip("On revive, a wall closer than this (meters) behind the revive point is pushed back to this distance.")] [Min(0)] public float backWallReviveDistance = 20;
+        [Header("Revive platform")]
+        [Tooltip("Platform copied once for revives. Empty = the 'Start Platform' child of Start Area.")] public Transform revivePlatformSource;
+        [Tooltip("Meters before a gimmick's slot where the platform goes after a laser death (half the platform size keeps it off the gimmick).")] [Min(0)] public float reviveGimmickMargin = 6;
+        public Transform RevivePlatform { get; private set; }
         public BackWall BackWall { get; private set; }
         /// <summary>Raised once per run when the chasing wall appears.</summary>
         public event System.Action BackWallSpawned;
@@ -64,9 +69,39 @@ namespace VRWebSwing
         long lastCenter = long.MinValue;
         int lastRopeVersion = -1;
         Vector3 initialStartPosition;
-        float initialStartZ;
+        float initialStartZ, revivePlatformX, revivePlatformY;
         bool initialized;
 
+        public struct LayoutSlot { public int kind; public double start; public float length; }
+        /// <summary>
+        /// Edit mode only (editor layout preview): the deterministic in-order section, i.e. every gimmick in list order with its
+        /// repeats and city segments, plus the cities before the first random gimmick. Uses the same generator as Play mode.
+        /// backWallSlot is the output index after which the chasing wall would spawn, or -1 without gimmicks.
+        /// </summary>
+        public void GetOrderedLayout(List<LayoutSlot> output, out int backWallSlot)
+        {
+            if (Application.isPlaying) throw new System.InvalidOperationException("Layout preview would overwrite the live corridor.");
+            output.Clear(); backWallSlot = -1;
+            validGimmicks = ValidGimmicks();
+            ResetSlots();
+            if (validGimmicks.Length == 0) { while (slots.Count < Mathf.Max(poolSize, 4)) AppendSlot(); }
+            else
+            {
+                while (lastOrderedSlot < 0 && slots.Count < 4096) AppendSlot();
+                backWallSlot = (int)lastOrderedSlot;
+                for (int i = 0; i < citySegmentsBetweenGimmicks; ++i) AppendSlot();
+            }
+            foreach (Slot slot in slots) output.Add(new LayoutSlot { kind = slot.kind, start = slot.start, length = slot.length });
+            slots.Clear(); lastOrderedSlot = -1;
+        }
+        int[] ValidGimmicks()
+        {
+            var valid = new List<int>();
+            if (gimmicks != null)
+                for (int i = 0; i < gimmicks.Length; ++i)
+                    if (gimmicks[i] != null && gimmicks[i].prefab) valid.Add(i);
+            return valid.ToArray();
+        }
         void Awake() => Initialize();
         void Initialize()
         {
@@ -82,15 +117,52 @@ namespace VRWebSwing
                 if (!segments[i]) segments[i] = Instantiate(segmentPrefab, transform).transform;
             indices = new long[segments.Length];
             for (int i = 0; i < indices.Length; ++i) indices[i] = long.MinValue;
-            var valid = new List<int>();
-            if (gimmicks != null)
-                for (int i = 0; i < gimmicks.Length; ++i)
-                    if (gimmicks[i] != null && gimmicks[i].prefab) valid.Add(i);
-            validGimmicks = valid.ToArray();
+            validGimmicks = ValidGimmicks();
             foreach (int kind in validGimmicks)
                 for (int n = 0; n < gimmickPrewarmCount; ++n) AddGimmickInstance(kind).gameObject.SetActive(false);
             if (backWallPrefab) { BackWall = Instantiate(backWallPrefab, transform); BackWall.Deactivate(); }
+            Transform source = revivePlatformSource ? revivePlatformSource : startArea.Find("Start Platform");
+            if (source)
+            {
+                RevivePlatform = Instantiate(source.gameObject, transform).transform;
+                RevivePlatform.name = "Revive Platform";
+                RevivePlatform.gameObject.SetActive(false);
+                revivePlatformX = source.position.x; revivePlatformY = source.position.y;
+            }
+            else Debug.LogWarning("EndlessCity: no revive platform source; revives will place the player without a platform.", this);
             ResetSlots();
+        }
+        /// <summary>Moves the single revive platform to the revive point and returns the feet position to teleport to.
+        /// Only Z follows the death; X and height match the start platform and start respawn point, which keeps revives in the clear corridor.</summary>
+        public Vector3 PlaceRevivePlatform(Vector3 deathPosition, Transform hazard, Vector3 startFeet)
+        {
+            float z = deathPosition.z;
+            // A hazard death (laser) revives in front of the whole run of that gimmick, never inside it.
+            if (hazard && TryGimmickRunStart(hazard, out double runStart)) z = LocalZ(runStart) - reviveGimmickMargin;
+            if (RevivePlatform)
+            {
+                RevivePlatform.position = new Vector3(revivePlatformX, revivePlatformY, z);
+                RevivePlatform.gameObject.SetActive(true);
+            }
+            return new Vector3(startFeet.x, startFeet.y, z);
+        }
+        /// <summary>Keeps a running wall at least backWallReviveDistance behind the revive point.</summary>
+        public void PushBackWallBehind(float z)
+        {
+            if (BackWall && BackWall.Running && BackWall.FrontZ > z - backWallReviveDistance) BackWall.SetFrontZ(z - backWallReviveDistance);
+        }
+        bool TryGimmickRunStart(Transform hazard, out double runStart)
+        {
+            runStart = 0;
+            for (int i = 0; i < gimmickObjects.Count; ++i)
+            {
+                if (!hazard.IsChildOf(gimmickObjects[i]) || gimmickSlots[i] < 0 || gimmickSlots[i] >= slots.Count) continue;
+                int slot = (int)gimmickSlots[i], kind = slots[slot].kind;
+                while (slot > 0 && slots[slot - 1].kind == kind) --slot; // back-to-back copies count as one gimmick
+                runStart = slots[slot].start;
+                return true;
+            }
+            return false;
         }
         public void ResetRun()
         {
@@ -99,6 +171,7 @@ namespace VRWebSwing
             for (int i = 0; i < indices.Length; ++i) indices[i] = long.MinValue;
             for (int i = 0; i < gimmickSlots.Count; ++i) gimmickSlots[i] = long.MinValue;
             if (BackWall) BackWall.Deactivate();
+            if (RevivePlatform) RevivePlatform.gameObject.SetActive(false);
             ResetSlots();
             // Teleport/reset will release the old tether; do not pin it during pool reset.
             course.motor.rope.Detach("New endless run");
@@ -153,6 +226,7 @@ namespace VRWebSwing
                 for (int i = 0; i < segments.Length; ++i) segments[i].position -= offset;
                 for (int i = 0; i < gimmickObjects.Count; ++i) gimmickObjects[i].position -= offset;
                 if (BackWall) BackWall.transform.position -= offset;
+                if (RevivePlatform) RevivePlatform.position -= offset;
                 course.motor.ShiftOrigin(offset);
             }
             lastCenter = CenterIndex(); lastRopeVersion = course.motor.rope.StateVersion;
