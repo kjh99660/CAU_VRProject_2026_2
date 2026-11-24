@@ -89,12 +89,13 @@ namespace VRWebSwing
             Vector3 beforeReel = transform.position;
             ApplyFloorReel(dt);
             if (course.CheckSegment(beforeReel, transform.position)) return;
-            if (TouchesHazard(PreviousPosition, transform.position)) { course.Respawn(); return; }
-            if (transform.position.y < settings.failHeight) course.Respawn();
+            if (TouchesHazard(PreviousPosition, transform.position, out Transform hazard)) { course.Die(DeathCause.Laser, hazard); return; }
+            if (transform.position.y < settings.failHeight) course.Die(DeathCause.Fall);
         }
         // Thin hazard triggers (lasers) can be skipped by a 0.7m step, so sweep the whole frame path plus the end pose.
-        bool TouchesHazard(Vector3 from, Vector3 to)
+        bool TouchesHazard(Vector3 from, Vector3 to, out Transform hazard)
         {
+            hazard = null;
             float half = Mathf.Max(0, body.height * 0.5f - body.radius);
             Vector3 top = from + body.center + Vector3.up * half, bottom = from + body.center - Vector3.up * half;
             Vector3 delta = to - from;
@@ -104,12 +105,12 @@ namespace VRWebSwing
                 int count = Physics.CapsuleCastNonAlloc(top, bottom, body.radius, delta / distance, hazardHits, distance,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
                 for (int i = 0; i < count; ++i)
-                    if (HitHazard(hazardHits[i].collider)) return true;
+                    if (HitHazard(hazardHits[i].collider)) { hazard = hazardHits[i].collider.transform; return true; }
             }
             int overlaps = Physics.OverlapCapsuleNonAlloc(top + delta, bottom + delta, body.radius, hazardOverlaps,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
             for (int i = 0; i < overlaps; ++i)
-                if (HitHazard(hazardOverlaps[i])) return true;
+                if (HitHazard(hazardOverlaps[i])) { hazard = hazardOverlaps[i].transform; return true; }
             return false;
         }
         static bool HitHazard(Collider collider)

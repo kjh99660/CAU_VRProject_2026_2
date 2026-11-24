@@ -168,14 +168,35 @@ public class LaserGenerator : MonoBehaviour
         line.useWorldSpace = false;
     }
 
-    // 인스펙터에서 선택 시 레이저가 나올 수 있는 높이 범위를 표시한다.
-    private void OnDrawGizmosSelected()
+    // 씬 뷰에 항상 표시: 레이저가 나올 수 있는 높이 범위를 붉게 칠하고, 설정 개수를 최소 간격으로 고르게 놓은 예시 선을 그린다.
+    // 실제 높이는 Play 때마다 이 범위 안에서 무작위(간격 보장)로 정해진다.
+    private void OnDrawGizmos()
     {
         Transform space = transform.parent ? transform.parent : transform;
         Vector3 local = space == transform ? Vector3.zero : transform.localPosition;
         float low = LowestHeight, high = Mathf.Max(low, maxHeight);
-        Vector3 center = space.TransformPoint(new Vector3(local.x, (low + high) / 2f, local.z));
-        Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.8f);
-        Gizmos.DrawWireCube(center, new Vector3(width, high - low, 0.2f));
+        Gizmos.matrix = space.localToWorldMatrix;
+        Vector3 center = new Vector3(local.x, (low + high) / 2f, local.z);
+        Vector3 size = new Vector3(width, high - low, 0.2f);
+        Gizmos.color = new Color(1f, 0.1f, 0.1f, 0.18f);
+        Gizmos.DrawCube(center, size);
+        Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.9f);
+        Gizmos.DrawWireCube(center, size);
+
+        // 예시 배치: 남는 여유를 위아래로 균등하게 나눈 높이. 선 사이 빈칸이 플레이어가 통과할 최소 공간이다.
+        int count = Mathf.Min(laserCount, MaxFittingCount);
+        float slack = Mathf.Max(0f, high - low - (count - 1) * CenterSpacing);
+        float first = low + slack / (count + 1);
+        for (int i = 0; i < count; ++i)
+        {
+            float y = first + i * (CenterSpacing + slack / (count + 1));
+            Gizmos.color = new Color(1f, 0.35f, 0.35f, 1f);
+            Gizmos.DrawCube(new Vector3(local.x, y, local.z), new Vector3(width, Mathf.Max(0.05f, laserThickness), 0.3f));
+        }
+        Gizmos.matrix = Matrix4x4.identity;
+#if UNITY_EDITOR
+        UnityEditor.Handles.Label(space.TransformPoint(new Vector3(local.x, high + 1f, local.z)),
+            $"Laser x{count}  {low:0.#}~{high:0.#}m  gap {ClearGap:0.##}m" + (count < laserCount ? $"  (설정 {laserCount}개 중 {count}개만 들어감)" : ""));
+#endif
     }
 }

@@ -1,7 +1,7 @@
 using UnityEngine;
 using VRWebSwing;
 
-// 플레이어 뒤에서 +Z(진행 방향)로 계속 따라오는 벽. 플레이어에게 닿으면 게임오버.
+// 플레이어 뒤에서 +Z(진행 방향)로 계속 따라오는 벽. 플레이어에게 닿으면 남은 목숨과 관계없이 게임오버.
 // EndlessCity가 랜덤 기믹 구간 진입 시 Activate()로 배치·시작한다. 프리팹 루트에 붙인다.
 public class BackWall : MonoBehaviour
 {
@@ -17,6 +17,8 @@ public class BackWall : MonoBehaviour
 
     public bool Running { get; private set; }
     public float FrontZ => transform.position.z + frontOffset;
+    /// <summary>앞면이 지정한 Z에 오도록 옮긴다(부활 시 벽을 뒤로 밀 때 사용).</summary>
+    public void SetFrontZ(float z) => transform.position = new Vector3(transform.position.x, transform.position.y, z - frontOffset);
 
     private SwingMotor motor;
 
@@ -39,6 +41,8 @@ public class BackWall : MonoBehaviour
         if (!Running || !motor) return;
         // 메뉴/중단 일시정지 중에는 벽도 멈춘다.
         if (motor.Paused) return;
+        // 부활 발판 위에 서 있는 동안은 정지한다. 줄을 걸면(Life = Alive) 다시 따라온다.
+        if (motor.course.Life == LifeState.Reviving) return;
 
         transform.position += Vector3.forward * (speed * Time.fixedDeltaTime);
 
@@ -51,7 +55,7 @@ public class BackWall : MonoBehaviour
     {
         Running = false;
         GameEvents.OnPlayerDeath?.Invoke(deathCause);
-        // 낙사·레이저와 같은 처리: 이번 기록을 종료하고 시작점에서 다시 시작한다(벽은 EndlessCity가 정리).
-        motor.course.Respawn();
+        // 남은 목숨과 관계없이 게임오버. 벽은 새 판이 시작될 때 EndlessCity가 정리한다.
+        motor.course.Die(DeathCause.BackWall);
     }
 }

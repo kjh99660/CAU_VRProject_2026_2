@@ -54,20 +54,52 @@ public class MovingPlatform : MonoBehaviour
         }
     }
 
-    // 인스펙터 창에서 오브젝트 선택 시 이동 경로를 미리 보여주는 기능
-    private void OnDrawGizmosSelected()
+    // 씬 뷰에 항상 표시: 발판의 시작·끝 위치(실제 메시 크기)와 왕복하며 지나가는 전체 범위를 칠해서 보여 준다.
+    private void OnDrawGizmos()
     {
         Vector3 localStart = Application.isPlaying ? startPos : transform.localPosition;
         Vector3 localEnd = localStart + moveOffset;
-        Transform parent = transform.parent;
-        Vector3 start = parent ? parent.TransformPoint(localStart) : localStart;
-        Vector3 end = parent ? parent.TransformPoint(localEnd) : localEnd;
+        Matrix4x4 parentMatrix = transform.parent ? transform.parent.localToWorldMatrix : Matrix4x4.identity;
 
+        // 발판 크기: 메시 경계(없으면 단위 큐브)를 발판 회전·스케일로 그린다.
+        var filter = GetComponent<MeshFilter>();
+        Bounds mesh = filter && filter.sharedMesh ? filter.sharedMesh.bounds : new Bounds(Vector3.zero, Vector3.one);
+        Matrix4x4 startMatrix = parentMatrix * Matrix4x4.TRS(localStart, transform.localRotation, transform.localScale);
+        Matrix4x4 endMatrix = parentMatrix * Matrix4x4.TRS(localEnd, transform.localRotation, transform.localScale);
+
+        // 이동 범위: 시작~끝 사이를 발판이 쓸고 지나가는 영역(부모 기준 축 정렬 근사)
+        Bounds sweep = LocalBounds(startMatrix, mesh, parentMatrix.inverse);
+        sweep.Encapsulate(LocalBounds(endMatrix, mesh, parentMatrix.inverse));
+        Gizmos.matrix = parentMatrix;
+        Gizmos.color = new Color(0f, 0.9f, 1f, 0.08f);
+        Gizmos.DrawCube(sweep.center, sweep.size);
+        Gizmos.color = new Color(0f, 0.9f, 1f, 0.5f);
+        Gizmos.DrawWireCube(sweep.center, sweep.size);
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(start, end);
+        Gizmos.DrawLine(localStart, localEnd);
 
-        // 시작점과 끝점에 플랫폼 크기만한 가이드 박스 표시
-        Gizmos.DrawWireCube(start, transform.lossyScale);
-        Gizmos.DrawWireCube(end, transform.lossyScale);
+        // 시작 위치는 진하게, 끝 위치는 옅게 칠한다.
+        Gizmos.matrix = startMatrix;
+        Gizmos.color = new Color(0f, 0.9f, 1f, 0.45f);
+        Gizmos.DrawCube(mesh.center, mesh.size);
+        Gizmos.matrix = endMatrix;
+        Gizmos.color = new Color(0f, 0.9f, 1f, 0.25f);
+        Gizmos.DrawCube(mesh.center, mesh.size);
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireCube(mesh.center, mesh.size);
+        Gizmos.matrix = Matrix4x4.identity;
+    }
+
+    // 메시 경계의 8개 꼭짓점을 부모 공간으로 옮겨 축 정렬 경계를 만든다.
+    private static Bounds LocalBounds(Matrix4x4 toWorld, Bounds mesh, Matrix4x4 worldToParent)
+    {
+        Matrix4x4 m = worldToParent * toWorld;
+        Bounds result = new Bounds(m.MultiplyPoint3x4(mesh.min), Vector3.zero);
+        for (int i = 1; i < 8; ++i)
+        {
+            Vector3 corner = new Vector3((i & 1) != 0 ? mesh.max.x : mesh.min.x, (i & 2) != 0 ? mesh.max.y : mesh.min.y, (i & 4) != 0 ? mesh.max.z : mesh.min.z);
+            result.Encapsulate(m.MultiplyPoint3x4(corner));
+        }
+        return result;
     }
 }

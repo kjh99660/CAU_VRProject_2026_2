@@ -103,6 +103,7 @@ namespace VRWebSwing.Tests
             city.rebaseDistance = 512; course.Restart();
             int[] ids = new int[city.segments.Length];
             for (int i = 0; i < ids.Length; ++i) ids[i] = city.segments[i].GetInstanceID();
+            int children = city.transform.childCount; // segments plus prewarmed gimmicks, wall and revive platform
             for (int tile = 1; tile <= 200; ++tile)
             {
                 float localZ = (float)(tile * 24d - city.OriginOffset);
@@ -113,12 +114,25 @@ namespace VRWebSwing.Tests
                 Assert.That(city.ActiveSegmentCount, Is.EqualTo(11));
             }
             Assert.That(course.RunDistance, Is.EqualTo(4800)); Assert.That(course.State, Is.Not.EqualTo(CourseState.Complete));
-            Assert.That(city.transform.childCount, Is.EqualTo(12));
+            Assert.That(city.segments.Length, Is.EqualTo(12)); Assert.That(city.transform.childCount, Is.EqualTo(children));
             for (int i = 0; i < ids.Length; ++i) Assert.That(city.segments[i].GetInstanceID(), Is.EqualTo(ids[i]));
-            // The void has no landing plane; falling ends this run and restores the start area and pool origin.
+            // The void has no landing plane; a fall with lives left revives on a platform at the same XZ and keeps the run.
             Assert.That(Physics.Raycast(new Vector3(0, 15, motor.transform.position.z), Vector3.down, 20, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore), Is.False);
-            motor.TeleportTo(new Vector3(0, -20, motor.transform.position.z));
+            course.reviveFadeTime = 0; course.gameOverDelay = 0;
+            float fallZ = motor.transform.position.z;
+            motor.TeleportTo(new Vector3(course.start.position.x + 3, -20, fallZ)); // off-centre fall: revive X snaps back to the start X
             yield return new WaitForFixedUpdate(); yield return new WaitForFixedUpdate();
+            Assert.That(course.Lives, Is.EqualTo(course.maxLives - 1)); Assert.That(course.Life, Is.EqualTo(LifeState.Reviving));
+            Assert.That(course.RunDistance, Is.EqualTo(4800));
+            Assert.That(Mathf.Abs(motor.transform.position.z - fallZ), Is.LessThan(0.01f));
+            Assert.That(motor.transform.position.x, Is.EqualTo(course.start.position.x).Within(0.01f));
+            Assert.That(motor.transform.position.y, Is.EqualTo(course.start.position.y).Within(0.3f));
+            Assert.That(Physics.Raycast(motor.transform.position + Vector3.up, Vector3.down, 2, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore), Is.True);
+            // The chasing wall ends the run regardless of lives; a new run restores the start area and pool origin.
+            course.Die(DeathCause.BackWall);
+            Assert.That(course.Life, Is.EqualTo(LifeState.GameOver)); Assert.That(course.Lives, Is.Zero);
+            yield return null; yield return new WaitForFixedUpdate();
+            Assert.That(course.Life, Is.EqualTo(LifeState.Alive)); Assert.That(course.Lives, Is.EqualTo(course.maxLives));
             Assert.That(course.RunDistance, Is.Zero); Assert.That(course.BestDistance, Is.EqualTo(4800));
             Assert.That(course.LastRunDistance, Is.EqualTo(4800)); Assert.That(city.OriginOffset, Is.Zero);
             Assert.That(Vector3.Distance(motor.transform.position, course.start.position), Is.LessThan(0.01f));
